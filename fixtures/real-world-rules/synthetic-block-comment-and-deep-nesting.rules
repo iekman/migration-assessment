@@ -1,0 +1,23 @@
+// Hand-authored (not harvested from a public repo) — the three real-world
+// files alongside this one didn't happen to exercise block comments or
+// three-level-deep nesting, so this fills those gaps deliberately.
+rules_version = '2';
+service cloud.firestore {
+  /* Multi-line block comment containing something that looks like a rule,
+     to make sure the parser's comment-stripping removes it before scanning:
+     match /shouldNotExist/{id} {
+       allow read: if true;
+     }
+  */
+  match /databases/{db}/documents {
+    match /orgs/{orgId} {
+      allow read: if true;
+      match /teams/{teamId} {
+        allow read: if true;
+        match /members/{memberId} {
+          allow read, write: if request.auth.uid == memberId;
+        }
+      }
+    }
+  }
+}

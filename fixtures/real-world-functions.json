@@ -1,0 +1,78 @@
+{
+  "_comment": "Real function names and trigger types, pulled from firebase/functions-samples (Node/, 2nd-gen SDK) via a shallow clone - not invented. Two raw variants per function test two different things: 'withMetadata' approximates what list_functions' structured eventTrigger/httpsTrigger fields would carry for a live 2nd-gen function (based on firebase-tools' existingBackend shape referenced in list_functions.ts - best-effort, unconfirmed against a real deployed project since the MCP server has no emulator support for list_functions); 'nameOnly' strips that down to just the name, to directly measure how often the naming-convention fallback alone gets it right on real-world names.",
+  "functions": [
+    {
+      "source": "Node/quickstarts/uppercase-firestore",
+      "realBuilder": "onDocumentCreated",
+      "name": "makeuppercase",
+      "expectedTrigger": "firestore-trigger",
+      "withMetadata": { "name": "makeuppercase", "eventTrigger": { "eventType": "google.cloud.firestore.document.v1.created" } },
+      "nameOnly": { "name": "makeuppercase" }
+    },
+    {
+      "source": "Node/quickstarts/uppercase-firestore",
+      "realBuilder": "onRequest",
+      "name": "addmessage",
+      "expectedTrigger": "https",
+      "withMetadata": { "name": "addmessage", "httpsTrigger": {} },
+      "nameOnly": { "name": "addmessage" }
+    },
+    {
+      "source": "Node/quickstarts/uppercase-rtdb",
+      "realBuilder": "onValueCreated",
+      "name": "makeuppercase_rtdb",
+      "expectedTrigger": "rtdb-trigger",
+      "withMetadata": { "name": "makeuppercase_rtdb", "eventTrigger": { "eventType": "google.firebase.database.ref.v1.created" } },
+      "nameOnly": { "name": "makeuppercase_rtdb" }
+    },
+    {
+      "source": "Node/quickstarts/thumbnails",
+      "realBuilder": "onObjectFinalized",
+      "name": "generateThumbnail",
+      "expectedTrigger": "storage-trigger",
+      "withMetadata": { "name": "generateThumbnail", "eventTrigger": { "eventType": "google.cloud.storage.object.v1.finalized" } },
+      "nameOnly": { "name": "generateThumbnail" }
+    },
+    {
+      "source": "Node/quickstarts/auth-blocking-functions",
+      "realBuilder": "beforeUserCreated",
+      "name": "validateNewUser",
+      "expectedTrigger": "auth-trigger",
+      "withMetadata": { "name": "validateNewUser", "eventTrigger": { "eventType": "providers/cloud.auth/eventTypes/user.beforeCreate" } },
+      "nameOnly": { "name": "validateNewUser" }
+    },
+    {
+      "source": "Node/quickstarts/auth-blocking-functions",
+      "realBuilder": "beforeUserSignedIn",
+      "name": "checkForBan",
+      "expectedTrigger": "auth-trigger",
+      "withMetadata": { "name": "checkForBan", "eventTrigger": { "eventType": "providers/cloud.auth/eventTypes/user.beforeSignIn" } },
+      "nameOnly": { "name": "checkForBan" }
+    },
+    {
+      "source": "Node/delete-unused-accounts-cron",
+      "realBuilder": "onSchedule",
+      "name": "accountcleanup",
+      "expectedTrigger": "scheduled",
+      "withMetadata": { "name": "accountcleanup", "triggerType": "scheduled" },
+      "nameOnly": { "name": "accountcleanup" }
+    },
+    {
+      "source": "Node/quickstarts/pubsub-helloworld",
+      "realBuilder": "onMessagePublished",
+      "name": "hellopubsub",
+      "expectedTrigger": "pubsub-trigger",
+      "note": "classify() used to bucket any name containing 'pubsub' as 'scheduled' (cron-like), conflating it with real time-based scheduling - fixed to its own 'pubsub-trigger' bucket (same call-site-injection family as Firestore/RTDB/Storage/Auth triggers) after this test caught it.",
+      "withMetadata": { "name": "hellopubsub", "eventTrigger": { "eventType": "google.cloud.pubsub.topic.v1.messagePublished" } },
+      "nameOnly": { "name": "hellopubsub" }
+    },
+    {
+      "source": "Node/quickstarts/callable-functions",
+      "realBuilder": "onCall",
+      "name": "addnumbers",
+      "expectedTrigger": "callable",
+      "withMetadata": { "name": "addnumbers", "triggerType": "callable" },
+      "nameOnly": { "name": "addnumbers" }
+    }
+  ]
+}

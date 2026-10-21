@@ -11,7 +11,8 @@
     "build": "tsc -p .",
     "start": "tsx src/cli.ts",
     "mock": "tsx src/cli.ts --mock --config fixtures/mock-project.config.json",
-    "typecheck": "tsc -p . --noEmit"
+    "typecheck": "tsc -p . --noEmit",
+    "test": "npm run build && node scripts/test-real-world.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0"

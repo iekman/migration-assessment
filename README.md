@@ -77,6 +77,75 @@ Given those constraints, this tool:
 10. Weights everything into an overall 0–10 score and writes a Markdown
     and/or JSON report.
 
+## Testing against real-world material
+
+Neither Firebase's MCP server nor serverpod_mcp lets you point this tool at
+a public GitHub repo directly — the MCP server calls live Google APIs for a
+specific project, not a checked-out codebase. What *is* testable without any
+live project or credentials: the parsing/heuristic logic, against real text
+pulled from public repos.
+
+- `fixtures/real-world-rules/` holds real `firestore.rules` files harvested
+  from [29ki/29k](https://github.com/29ki/29k) (production app, flat
+  multi-segment subcollection form), [firebase/quickstart-js](https://github.com/firebase/quickstart-js)
+  (official sample, block-nested subcollection form), and
+  [satansdeer/firebase-albums](https://github.com/satansdeer/firebase-albums)
+  (the default wide-open template with no named collection at all — a good
+  check that the parser doesn't hallucinate a name from a bare wildcard),
+  plus one hand-authored file covering block comments and three-level
+  nesting that the harvested set didn't happen to exercise.
+- `fixtures/real-world-functions.json` holds real function names and
+  trigger types pulled from [firebase/functions-samples](https://github.com/firebase/functions-samples)
+  (2nd-gen Node quickstarts).
+- `npm run test` runs both against the actual parser/classifier (not
+  separate reimplementations) and reports results.
+
+This caught two real bugs no amount of staring at the code (or testing only
+against our own hand-written mock fixtures) turned up:
+
+1. `classify()` in `src/collectors/functions.ts` passed real GCP event-type
+   strings (`google.cloud.firestore.document.v1.created`) straight through
+   as the trigger type, instead of normalizing them into this tool's
+   internal `*-trigger` buckets — so the *structured-metadata* path, meant
+   to be the ground-truth case, silently fell into the weakest
+   "undetermined" bucket for exactly the input shape a real project would
+   send. Fixed in `normalizeExplicitTrigger`.
+2. Pub/Sub-triggered functions (`onMessagePublished`) were bucketed with
+   true cron scheduling (`onSchedule`) just because both names can contain
+   "pubsub"/"scheduled"-ish substrings. They're a different migration
+   pattern — Pub/Sub triggers need call-site injection like the other
+   background triggers, not FutureCall rescheduling — so they now get their
+   own `pubsub-trigger` bucket in the same high-severity family as
+   Firestore/RTDB/Storage/Auth triggers.
+
+It also produced an honest, measured (not guessed) number worth knowing:
+on 9 real 2nd-gen function names, the naming-convention fallback (used only
+when `list_functions` doesn't return structured trigger metadata) guessed
+correctly **2 times out of 9**. Most modern function names
+(`makeuppercase`, `addmessage`, `generateThumbnail`, `validateNewUser`)
+carry no trigger-indicating substring at all. That's not a defect to fix —
+there's no naming convention to lean on harder — it's a quantified reason
+to treat the naming fallback as a last resort, and to lean on
+`functionSideEffects` in config whenever `list_functions` doesn't return
+rich metadata for a project.
+
+**What testing couldn't reach, and why:** the live-sampling collectors
+(`query_collection`, `get_users`, `list_functions`, `get_data`,
+`get_security_rules`) need either a real deployed project or the Firebase
+Local Emulator Suite. Checking the firebase-tools source directly (not
+guessing) found emulator support is narrow: only `firestore.query_collection`,
+`storage.get_object_download_url`, and Data Connect's tools can target an
+emulator (via a `use_emulator` flag resolved through the Emulator Hub,
+confirmed from `src/mcp/index.ts`'s `getEmulatorUrl`) — `auth.get_users`,
+`realtime_database.get_data`/`set_data`, `functions.list_functions`, and
+`core.get_security_rules` have no emulator path at all and always hit the
+live project. Since rules-reading and function-listing are central to this
+tool and neither supports the emulator, a local emulator buys relatively
+little beyond what the harvested-text approach above already covers for
+rules, and nothing for functions or auth — a disposable real Firebase
+project remains the only way to exercise those end to end, which is real
+setup cost, not something to take on without deciding it's worth it first.
+
 ## Try it without any credentials
 
 ```bash
@@ -155,6 +224,12 @@ npm run mock
   no explicit rule of its own (inheriting access, or unprotected) leaves
   nothing in the text to find; that's inherent, not a parser limitation,
   and is why `knownSubcollections` in config still exists as a fallback.
+- The rules parser's tree can represent arbitrarily deep nesting
+  (`orgs/{id}/teams/{id}/members`), but the sampling plan in
+  `collectFirestore` only walks one level down from each top-level seed
+  collection — a subcollection nested two or more levels deep gets
+  correctly discovered but not sampled. Found by testing the parser
+  against a deliberately 3-level-deep case; not yet fixed.
 - Denormalized-field, multi-tenancy, and installed-Extension detection
   are pattern matches on naming conventions, not certainty — each one is
   surfaced as a low-confidence "suspected" finding that invites

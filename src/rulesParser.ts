@@ -38,12 +38,15 @@ const TENANT_TOKEN_RE =
 // keep "databases"/"documents" out of the collection tree.
 const MATCH_HEADER_PAIR_RE = /\/([A-Za-z0-9_-]+)\/\{[^}]+\}/g;
 
-function stripLineComments(text: string): string {
-  return text.replace(/\/\/[^\n]*/g, "");
+function stripComments(text: string): string {
+  // CEL (which the Firestore/Storage rules language is built on) supports
+  // both comment forms; strip block comments first so a "//" inside one
+  // doesn't swallow the rest of the block.
+  return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 }
 
 export function parseCollectionTree(rawText: string): ParsedRules {
-  const text = stripLineComments(rawText);
+  const text = stripComments(rawText);
 
   const tenantHints = new Set<string>();
   for (const m of text.matchAll(TENANT_TOKEN_RE)) tenantHints.add(m[0]);

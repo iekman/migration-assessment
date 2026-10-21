@@ -2,13 +2,35 @@ import { extractResultData, type IMcpClient } from "../firebaseMcpClient.js";
 import type { DimensionResult, Finding } from "../types.js";
 import type { AssessorConfig } from "../config.js";
 
-interface FunctionInfo {
+export interface FunctionInfo {
   name: string;
   triggerType?: string;
   raw: Record<string, unknown>;
 }
 
-function classify(raw: Record<string, unknown>): FunctionInfo {
+// Real GCP/Firebase event-type strings (what list_functions' structured
+// metadata actually looks like for a 2nd-gen function, confirmed against
+// real examples from firebase/functions-samples) aren't yet in our
+// internal "-trigger" vocabulary on their own — map them in, rather than
+// passing them through raw and having them silently miss every switch
+// case downstream in collectFunctions (which is what happened before this
+// was caught by testing against real-world function metadata).
+const EVENT_TYPE_PATTERNS: Array<[RegExp, string]> = [
+  [/firestore\.document/i, "firestore-trigger"],
+  [/firebase\.database\.ref/i, "rtdb-trigger"],
+  [/cloud\.storage\.object/i, "storage-trigger"],
+  [/cloud\.auth|firebase\.auth/i, "auth-trigger"],
+  [/cloud\.pubsub\.topic/i, "pubsub-trigger"],
+];
+
+function normalizeExplicitTrigger(raw: string): string {
+  for (const [pattern, bucket] of EVENT_TYPE_PATTERNS) {
+    if (pattern.test(raw)) return bucket;
+  }
+  return raw; // genuinely unrecognized - falls through to the "undetermined" bucket downstream, which is honest
+}
+
+export function classify(raw: Record<string, unknown>): FunctionInfo {
   const name = String(raw.name ?? raw.id ?? raw.functionName ?? "unknown");
   const explicitTrigger =
     (raw.triggerType as string) ??
@@ -16,15 +38,22 @@ function classify(raw: Record<string, unknown>): FunctionInfo {
     ((raw.httpsTrigger ? "https" : undefined) as string | undefined) ??
     ((raw.eventTrigger as Record<string, unknown> | undefined)?.eventType as string | undefined);
 
-  if (explicitTrigger) return { name, triggerType: explicitTrigger, raw };
+  if (explicitTrigger) return { name, triggerType: normalizeExplicitTrigger(explicitTrigger), raw };
 
   // No structured trigger metadata surfaced by list_functions in this
   // server version — fall back to Firebase's own naming conventions.
+  // Real-world testing against firebase/functions-samples' 2nd-gen
+  // function names found this catches a small minority of cases (2/9 in
+  // that sample) - most real names (makeuppercase, addmessage,
+  // generateThumbnail, validateNewUser) carry no trigger-indicating
+  // substring at all. This is a known, measured weakness, not treated as
+  // reliable - see fixtures/real-world-functions.json.
   const lower = name.toLowerCase();
   let guessed: string | undefined;
   if (/oncall|callable/.test(lower)) guessed = "callable";
   else if (/onrequest|https?/.test(lower)) guessed = "https";
-  else if (/onschedule|scheduled|cron|pubsub/.test(lower)) guessed = "scheduled";
+  else if (/onschedule|scheduled|cron/.test(lower)) guessed = "scheduled";
+  else if (/pubsub/.test(lower)) guessed = "pubsub-trigger";
   else if (/oncreate|onupdate|ondelete|onwrite|firestore/.test(lower)) guessed = "firestore-trigger";
   else if (/rtdb|database/.test(lower)) guessed = "rtdb-trigger";
   else if (/onauth|beforecreate|beforesignin|auth/.test(lower)) guessed = "auth-trigger";
@@ -118,7 +147,7 @@ export async function collectFunctions(
           dimension: "functions",
           severity: deploymentModel === "serverless" ? "high" : "medium",
           weight: count * 1.5,
-          summary: `${count} scheduled/pubsub function(s)`,
+          summary: `${count} scheduled (cron) function(s)`,
           detail:
             "Serverpod has a future-call/cron-style scheduling mechanism, but the schedule + retry " +
             "semantics need re-declaring, not just moving code." +
@@ -126,17 +155,27 @@ export async function collectFunctions(
         });
       } else if (trigger.endsWith("-trigger")) {
         complexityPoints += count * 3;
-        const names = classified.filter((f) => f.triggerType === trigger).map((f) => f.name);
+        // Same filter as the byTrigger tally above - a function already
+        // covered by a functionSideEffects override is reported there with
+        // better information and shouldn't also show up here, or the name
+        // list and the count it's attached to disagree (found by testing
+        // this against mock data where onUserDelete has such an override
+        // and shares a trigger type with another function that doesn't).
+        const names = classified
+          .filter((f) => f.triggerType === trigger && !functionSideEffects[f.name])
+          .map((f) => f.name);
         findings.push({
           dimension: "functions",
           severity: "high",
           weight: count * 3,
           summary: `${count} ${trigger.replace("-trigger", "")} background-trigger function(s): ${names.join(", ")}`,
           detail:
-            "Firestore/RTDB/Auth/Storage triggers auto-fire on writes with no direct Serverpod " +
-            "equivalent. Each one has to become explicit application code: called from the write " +
-            "path (the Serverpod endpoint or repository method that performs the equivalent write) " +
-            "since there's no database-level change-trigger to hook into out of the box.",
+            "Firestore/RTDB/Auth/Storage triggers auto-fire on writes, and Pub/Sub triggers auto-fire " +
+            "on a published message - none have a direct Serverpod equivalent. Each one has to become " +
+            "explicit application code: called from the write path (the Serverpod endpoint or " +
+            "repository method that performs the equivalent write), or, for Pub/Sub, from wherever " +
+            "the message would have been published, since there's no database- or queue-level " +
+            "change-trigger to hook into out of the box.",
           serverpodNote:
             `Highest-risk category: audit each of ${names.join(", ")} for side effects (emails, ` +
             "other writes, cascading deletes) and hand-place the equivalent calls in the " +
@@ -150,7 +189,7 @@ export async function collectFunctions(
           severity: "medium",
           weight: count * 1,
           summary: `${count} function(s) with undetermined trigger type`,
-          detail: `Names: ${classified.filter((f) => f.triggerType === trigger).map((f) => f.name).join(", ")}. list_functions didn't expose structured trigger metadata in this server version — verify manually, or fill in functionSideEffects in config.`,
+          detail: `Names: ${classified.filter((f) => f.triggerType === trigger && !functionSideEffects[f.name]).map((f) => f.name).join(", ")}. list_functions didn't expose structured trigger metadata in this server version — verify manually, or fill in functionSideEffects in config.`,
         });
       }
     }
