@@ -25,6 +25,8 @@ export interface ParsedRules {
   subcollections: Record<string, string[]>;
   /** Tenant/org-like identifiers referenced anywhere in the text (e.g. "orgId"), a multi-tenancy hint. */
   tenantHints: string[];
+  /** Deepest collection/subcollection chain found (1 = only top-level collections, no nesting). */
+  maxNestingDepth: number;
 }
 
 const TENANT_TOKEN_RE =
@@ -87,9 +89,14 @@ export function parseCollectionTree(rawText: string): ParsedRules {
   };
   for (const child of root.children.values()) collectSubcollections(child);
 
+  const depthOf = (node: CollectionNode): number =>
+    node.children.size === 0 ? 1 : 1 + Math.max(...[...node.children.values()].map(depthOf));
+  const maxNestingDepth = root.children.size === 0 ? 0 : Math.max(...[...root.children.values()].map(depthOf));
+
   return {
     topLevelCollections: [...root.children.keys()],
     subcollections,
     tenantHints: [...tenantHints],
+    maxNestingDepth,
   };
 }

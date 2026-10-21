@@ -42,6 +42,20 @@ export async function collectAuth(client: IMcpClient, sampleUids: string[]): Pro
     const data = extractResultData(result) as { users?: UserRecord[] } | UserRecord[];
     const users = (Array.isArray(data) ? data : data.users ?? []) as UserRecord[];
 
+    if (users.length === 0) {
+      findings.push({
+        dimension: "auth",
+        severity: "medium",
+        weight: 1,
+        summary: `Requested ${sampleUids.length} user(s), got 0 back`,
+        detail:
+          "Either the UIDs in authSampleUids are wrong/stale (e.g. users since deleted), or this " +
+          "project genuinely has no users yet. Either way, nothing was learned about provider mix " +
+          "or custom claims usage on this run — verify the UIDs or supply different ones.",
+      });
+      return { dimension: "Firebase Auth -> Serverpod Auth", score: 2, findings };
+    }
+
     const providers = new Set<string>();
     let withClaims = 0;
     for (const u of users) {

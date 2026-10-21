@@ -1,0 +1,14 @@
+{
+  "projectId": "bloghub-example",
+  "firestoreCollections": ["posts", "courses"],
+  "knownSubcollections": { "posts": ["comments"] },
+  "denormalizedFields": [],
+  "sampleSize": 25,
+  "realtimeDatabasePaths": [],
+  "authSampleUids": ["a1", "a2"],
+  "multiTenant": false,
+  "installedExtensions": [],
+  "deploymentModel": "persistent",
+  "functionSideEffects": {},
+  "useServerpodOracle": false
+}

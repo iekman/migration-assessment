@@ -131,6 +131,11 @@ export async function collectFirestore(
         complexityPoints += 1;
         notes.push("has GeoPoint fields (no native Serverpod/Postgres type — use PostGIS point or lat/lng columns)");
       }
+      const nullableFields = [...shape.fields.entries()].filter(([, f]) => f.nullable).map(([name]) => name);
+      if (nullableFields.length > 0) {
+        complexityPoints += 0.5;
+        notes.push(`has nullable field(s) (${nullableFields.join(", ")}) - these need a nullable Dart type and no NOT NULL constraint, rather than assuming every field is always present`);
+      }
       if (shape.hasArrayOfMapFields) {
         complexityPoints += 1.5;
         notes.push("has array-of-map fields (needs a typed Dart class + json/serialized column, or a join table)");

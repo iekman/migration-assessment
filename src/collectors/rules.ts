@@ -53,10 +53,12 @@ export async function collectRules(
       const result = await client.callReadOnlyTool(toolName, { type });
       const text = extractRuleText(extractResultData(result));
 
+      let firestoreNestingDepth = 0;
       if (type === "firestore") {
         const parsed = parseCollectionTree(text);
         discoveredFirestoreCollections = parsed.topLevelCollections;
         discoveredSubcollections = parsed.subcollections;
+        firestoreNestingDepth = parsed.maxNestingDepth;
         for (const hint of parsed.tenantHints) allTenantHints.add(hint);
       } else {
         // storage/database rules don't have Firestore-style collection
@@ -71,12 +73,6 @@ export async function collectRules(
       const getExistsCalls = countOccurrences(text, /\b(get|exists|getAfter)\s*\(/g);
       const customFunctions = countOccurrences(text, /function\s+\w+\s*\(/g);
       const allowStatements = countOccurrences(text, /allow\s+\w/g);
-      const wildcardDepth = Math.max(
-        0,
-        ...([...text.matchAll(/match\s+([^\{]+)\{/g)] as RegExpMatchArray[]).map(
-          (m) => (m[1].match(/\{[^}]+\}/g) ?? []).length,
-        ),
-      );
 
       if (getExistsCalls > 0) {
         complexityPoints += 2;
@@ -104,13 +100,13 @@ export async function collectRules(
           detail: "Each helper encodes a reusable authorization predicate to reimplement in Dart.",
         });
       }
-      if (wildcardDepth >= 3) {
+      if (firestoreNestingDepth >= 3) {
         complexityPoints += 1;
         findings.push({
           dimension: "security-rules",
           severity: "medium",
           weight: 1,
-          summary: `${type}.rules has deeply nested path matches (depth ${wildcardDepth})`,
+          summary: `${type}.rules has deeply nested collections (${firestoreNestingDepth} levels)`,
           detail:
             "Deep nesting usually mirrors a deep subcollection hierarchy, which doesn't map to a " +
             "flat relational schema without denormalization or join tables.",

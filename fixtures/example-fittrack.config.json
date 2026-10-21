@@ -1,0 +1,16 @@
+{
+  "projectId": "fittrack-example",
+  "firestoreCollections": ["workouts"],
+  "knownSubcollections": {},
+  "denormalizedFields": [],
+  "sampleSize": 25,
+  "realtimeDatabasePaths": ["/status"],
+  "authSampleUids": ["ghost1", "ghost2"],
+  "multiTenant": false,
+  "installedExtensions": [],
+  "deploymentModel": "undecided",
+  "functionSideEffects": {
+    "logWorkout": "writes the workout document and, if a new personal record, also updates a separate 'records' summary document for that user"
+  },
+  "useServerpodOracle": false
+}

@@ -1,0 +1,41 @@
+{
+  "responses": {
+    "get_project": { "displayName": "BlogHub" },
+    "list_apps": [{ "platform": "WEB", "appId": "1:444:web:a" }],
+    "get_security_rules": {
+      "__byArg__": "type",
+      "values": {
+        "firestore": {
+          "source": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{db}/documents {\n    match /posts/{postId} {\n      allow read: if true;\n      allow write: if request.auth != null;\n      match /comments/{commentId} {\n        allow read: if true;\n        allow write: if request.auth != null;\n      }\n    }\n    match /courses/{courseId}/modules/{moduleId}/lessons/{lessonId} {\n      allow read: if true;\n    }\n  }\n}\n"
+        },
+        "storage": { "source": "rules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    match /{allPaths=**} {\n      allow read: if true;\n      allow write: if request.auth != null;\n    }\n  }\n}\n" },
+        "database": { "source": "{\n  \"rules\": {\n    \".read\": false,\n    \".write\": false\n  }\n}\n" }
+      }
+    },
+    "query_collection": {
+      "__byArg__": "collection_path",
+      "values": {
+        "posts": {
+          "documents": [
+            { "data": { "title": "Hello World", "authorId": "a1", "published": true } },
+            { "data": { "title": "Second Post", "authorId": "a2", "published": false } }
+          ]
+        },
+        "posts/*/comments": { "documents": [{ "data": { "authorId": "a1", "text": "nice!" } }] },
+        "courses": { "documents": [{ "data": { "title": "Intro to Dart", "level": "beginner" } }] }
+      }
+    },
+    "list_functions": [
+      { "name": "createPost", "triggerType": "callable" },
+      { "name": "onCommentCreate", "eventTrigger": { "eventType": "google.cloud.firestore.document.v1.created" } }
+    ],
+    "get_users": {
+      "users": [
+        { "uid": "a1", "email": "a1@example.com", "providerData": [{ "providerId": "password" }] },
+        { "uid": "a2", "email": "a2@example.com", "providerData": [{ "providerId": "password" }] }
+      ]
+    },
+    "get_data": { "__byArg__": "path", "values": { "default": {} } },
+    "get_template": { "parameters": {}, "conditions": [] }
+  }
+}

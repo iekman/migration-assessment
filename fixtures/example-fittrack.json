@@ -1,0 +1,41 @@
+{
+  "responses": {
+    "get_project": { "displayName": "FitTrack" },
+    "list_apps": [
+      { "platform": "IOS", "appId": "1:333:ios:a" },
+      { "platform": "ANDROID", "appId": "1:333:android:b" }
+    ],
+    "get_security_rules": {
+      "__byArg__": "type",
+      "values": {
+        "firestore": {
+          "source": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{db}/documents {\n    match /workouts/{workoutId} {\n      allow read, write: if request.auth.uid == resource.data.userId;\n      match /sets/{setId} {\n        allow read, write: if request.auth.uid == resource.data.userId;\n      }\n    }\n  }\n}\n"
+        },
+        "storage": { "source": "rules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    match /{allPaths=**} {\n      allow read, write: if false;\n    }\n  }\n}\n" },
+        "database": { "source": "{\n  \"rules\": {\n    \"status\": { \".read\": true, \".write\": \"auth != null\" }\n  }\n}\n" }
+      }
+    },
+    "query_collection": {
+      "__byArg__": "collection_path",
+      "values": {
+        "workouts": {
+          "documents": [
+            { "data": { "userId": "u1", "type": "run", "distanceKm": 5.2, "sets": [], "notes": "felt good" } },
+            { "data": { "userId": "u1", "type": "lift", "distanceKm": null, "sets": [{ "exercise": "squat", "reps": 5, "weightKg": 100 }, { "exercise": "bench", "reps": 8, "weightKg": 60 }] } },
+            { "data": { "userId": "u2", "type": "run", "distanceKm": 10.1, "sets": [] } }
+          ]
+        },
+        "workouts/*/sets": { "documents": [{ "data": { "exercise": "squat", "reps": 5 } }] }
+      }
+    },
+    "list_functions": [
+      { "name": "logWorkout", "httpsTrigger": true },
+      { "name": "weeklyReminder", "triggerType": "scheduled" },
+      { "name": "onWorkoutDelete", "eventTrigger": { "eventType": "google.cloud.firestore.document.v1.deleted" } }
+    ],
+    "get_users": { "users": [] },
+    "get_data": { "__byArg__": "path", "values": { "/status": { "online": true, "lastPing": 172400000 }, "default": {} } },
+    "get_template": { "parameters": {}, "conditions": [] },
+    "list_services": []
+  }
+}

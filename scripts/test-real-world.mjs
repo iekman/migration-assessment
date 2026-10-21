@@ -26,16 +26,19 @@ const RULES_EXPECTATIONS = {
     topLevelCollections: ["sessions"],
     subcollections: { sessions: ["state"] },
     tenantHints: [],
+    maxNestingDepth: 2,
   },
   "firebase-quickstart-js.rules": {
     topLevelCollections: ["restaurants"],
     subcollections: { restaurants: ["ratings"] },
     tenantHints: [],
+    maxNestingDepth: 2,
   },
   "satansdeer-firebase-albums.rules": {
     topLevelCollections: [],
     subcollections: {},
     tenantHints: [],
+    maxNestingDepth: 0,
   },
   "synthetic-block-comment-and-deep-nesting.rules": {
     topLevelCollections: ["orgs"],
@@ -44,6 +47,7 @@ const RULES_EXPECTATIONS = {
     // but it legitimately matches the tenant-hint pattern - a reasonable
     // thing to flag either way, so the heuristic isn't wrong to catch it.
     tenantHints: ["orgId"],
+    maxNestingDepth: 3,
   },
 };
 
@@ -62,6 +66,7 @@ for (const file of readdirSync(rulesDir).sort()) {
     assert.deepEqual(result.topLevelCollections.sort(), expected.topLevelCollections.sort());
     assert.deepEqual(result.subcollections, expected.subcollections);
     assert.deepEqual(result.tenantHints.sort(), expected.tenantHints.sort());
+    assert.equal(result.maxNestingDepth, expected.maxNestingDepth);
     console.log(`OK ${file}`);
   } catch (err) {
     failures++;
