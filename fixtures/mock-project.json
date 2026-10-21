@@ -1,0 +1,78 @@
+{
+  "responses": {
+    "get_project": { "displayName": "Acme Notes (mock)" },
+    "list_apps": [
+      { "platform": "IOS", "appId": "1:111:ios:aaa" },
+      { "platform": "ANDROID", "appId": "1:111:android:bbb" },
+      { "platform": "WEB", "appId": "1:111:web:ccc" }
+    ],
+    "get_security_rules": {
+      "__byArg__": "type",
+      "values": {
+        "firestore": {
+          "source": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{db}/documents {\n    function isOwner(uid) { return request.auth.uid == uid; }\n    match /users/{uid} {\n      allow read, write: if isOwner(uid);\n    }\n    match /notes/{noteId} {\n      allow read: if resource.data.ownerId == request.auth.uid || exists(/databases/$(db)/documents/shares/$(noteId + '_' + request.auth.uid));\n      allow write: if get(/databases/$(db)/documents/users/$(request.auth.uid)).data.plan == 'pro';\n      match /comments/{commentId} {\n        allow read, write: if isOwner(resource.data.authorId);\n      }\n    }\n  }\n}\n"
+        },
+        "storage": {
+          "source": "rules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    match /avatars/{uid} {\n      allow read: if true;\n      allow write: if request.auth.uid == uid;\n    }\n  }\n}\n"
+        },
+        "database": { "source": "{\n  \"rules\": {\n    \".read\": false,\n    \".write\": false\n  }\n}\n" }
+      }
+    },
+    "query_collection": {
+      "__byArg__": "collection_path",
+      "values": {
+        "users": {
+          "documents": [
+            { "data": { "displayName": "Ann", "plan": "pro", "createdAt": "2024-01-05T10:00:00Z" } },
+            { "data": { "displayName": "Bo", "plan": "free", "createdAt": "2024-02-11T10:00:00Z" } },
+            { "data": { "displayName": "Cy", "plan": "pro", "createdAt": "2024-03-02T10:00:00Z", "referredBy": { "__type__": "reference", "path": "users/ann" } } }
+          ]
+        },
+        "notes": {
+          "documents": [
+            {
+              "data": {
+                "title": "Groceries",
+                "ownerId": "ann",
+                "ownerDisplayName": "Ann",
+                "tags": ["home", "urgent"],
+                "location": { "__type__": "geopoint", "latitude": 52.5, "longitude": 13.4 },
+                "collaborators": [{ "uid": "bo", "role": "editor" }, { "uid": "cy", "role": "viewer" }]
+              }
+            },
+            { "data": { "title": "Trip plan", "ownerId": "bo", "ownerDisplayName": "Bo", "tags": ["travel"], "budget": 500 } },
+            { "data": { "title": "Legacy note", "ownerId": "ann", "ownerDisplayName": "Ann", "budget": "unknown" } }
+          ]
+        },
+        "notes/*/comments": {
+          "documents": [
+            { "data": { "authorId": "bo", "text": "lgtm" } },
+            { "data": { "authorId": "ann", "text": "thanks!" } }
+          ]
+        }
+      }
+    },
+    "list_functions": [
+      { "name": "onNoteCreate", "eventTrigger": { "eventType": "google.cloud.firestore.document.v1.created" } },
+      { "name": "onUserDelete", "eventTrigger": { "eventType": "google.cloud.firestore.document.v1.deleted" } },
+      { "name": "sendWeeklyDigest", "triggerType": "scheduled" },
+      { "name": "createNoteCallable", "httpsTrigger": true }
+    ],
+    "get_users": {
+      "users": [
+        { "uid": "ann", "email": "ann@example.com", "providerData": [{ "providerId": "password" }], "customClaims": { "role": "admin" } },
+        { "uid": "bo", "phoneNumber": "+15555550123", "providerData": [{ "providerId": "phone" }] },
+        { "uid": "cy", "providerData": [{ "providerId": "google.com" }] }
+      ]
+    },
+    "get_data": {
+      "__byArg__": "path",
+      "values": {
+        "/presence": { "ann": { "online": true, "lastSeen": { "ts": 123, "device": { "os": "ios", "meta": { "build": 42 } } } } },
+        "default": {}
+      }
+    },
+    "get_template": { "parameters": { "new_editor_enabled": {}, "max_notes_free_tier": {} }, "conditions": [{ "name": "beta_users" }] },
+    "list_services": []
+  }
+}

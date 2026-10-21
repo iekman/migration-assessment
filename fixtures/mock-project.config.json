@@ -1,0 +1,18 @@
+{
+  "projectId": "acme-notes-mock",
+  "firestoreCollections": ["users", "notes"],
+  "knownSubcollections": { "notes": ["comments"] },
+  "denormalizedFields": [
+    { "collection": "notes", "field": "ownerDisplayName", "sourceOfTruth": "users.displayName", "note": "kept in sync by a Cloud Function on user profile updates" }
+  ],
+  "sampleSize": 25,
+  "realtimeDatabasePaths": ["/presence"],
+  "authSampleUids": ["ann", "bo", "cy"],
+  "multiTenant": false,
+  "installedExtensions": ["firestore-stripe-payments"],
+  "deploymentModel": "serverless",
+  "functionSideEffects": {
+    "onUserDelete": "cascades: deletes all of the user's notes and removes them from any shared note's collaborators array"
+  },
+  "useServerpodOracle": false
+}
