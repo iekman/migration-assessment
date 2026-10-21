@@ -1,0 +1,116 @@
+{
+  "responses": {
+    "get_project": { "displayName": "MegaCorp CRM" },
+    "list_apps": [
+      { "platform": "IOS", "appId": "1:999:ios:a" },
+      { "platform": "ANDROID", "appId": "1:999:android:b" },
+      { "platform": "WEB", "appId": "1:999:web:c" },
+      { "platform": "WEB", "appId": "1:999:web:d" }
+    ],
+    "get_security_rules": {
+      "__byArg__": "type",
+      "values": {
+        "firestore": {
+          "source": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{db}/documents {\n    function isOwner(uid) { return request.auth.uid == uid; }\n    function hasRole(role) { return role in get(/databases/$(db)/documents/users/$(request.auth.uid)).data.roles; }\n\n    match /accounts/{accountId} {\n      allow read: if get(/databases/$(db)/documents/accounts/$(accountId)).data.workspaceId == request.auth.token.workspaceId;\n      allow write: if hasRole('admin');\n      match /teams/{teamId} {\n        allow read: if true;\n        match /members/{memberId} {\n          allow read, write: if isOwner(memberId);\n        }\n      }\n    }\n    match /deals/{dealId} {\n      allow read, write: if exists(/databases/$(db)/documents/accounts/$(resource.data.accountId));\n    }\n    match /contacts/{contactId} {\n      allow read, write: if isOwner(resource.data.ownerId);\n      match /notes/{noteId} {\n        allow read, write: if isOwner(resource.data.authorId);\n      }\n    }\n    match /activities/{activityId} {\n      allow read: if true;\n      allow write: if request.auth != null;\n    }\n  }\n}\n"
+        },
+        "storage": { "source": "rules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    match /invoices/{accountId}/{fileName} {\n      allow read: if request.auth != null;\n      allow write: if false;\n    }\n  }\n}\n" },
+        "database": { "source": "{\n  \"rules\": {\n    \"presence\": { \".read\": true, \".write\": \"auth != null\" },\n    \"legacy\": { \".read\": true, \".write\": false }\n  }\n}\n" }
+      }
+    },
+    "query_collection": {
+      "__byArg__": "collection_path",
+      "values": {
+        "accounts": {
+          "documents": [
+            {
+              "data": {
+                "name": "Acme Corp", "industry": "Manufacturing", "annualRevenue": 5200000, "employeeCount": 340,
+                "website": "acme.example.com", "phone": "+1-555-0100",
+                "headquartersLocation": { "__type__": "geopoint", "latitude": 41.8, "longitude": -87.6 },
+                "billingContacts": [{ "name": "Pat Lee", "role": "AP" }, { "name": "Sam Rios", "role": "CFO" }],
+                "parentAccountId": { "__type__": "reference", "path": "accounts/holdingco" },
+                "workspaceId": "ws_acme", "tier": "enterprise", "createdAt": "2023-02-01T00:00:00Z",
+                "status": "active", "totalDealsValue": 1200000, "churnRisk": "low", "renewalDate": "2026-12-01",
+                "accountManagerId": "ann", "region": "NA", "segment": "manufacturing"
+              }
+            },
+            {
+              "data": {
+                "name": "Bolt Logistics", "industry": "Logistics", "annualRevenue": "N/A", "employeeCount": 12,
+                "website": "bolt.example.com", "phone": "+1-555-0101",
+                "billingContacts": [{ "name": "Jo Kim", "role": "Owner" }],
+                "workspaceId": "ws_bolt", "tier": "smb", "createdAt": "2025-06-15T00:00:00Z",
+                "status": "trial", "totalDealsValue": 0, "churnRisk": "unknown", "renewalDate": null,
+                "accountManagerId": "bo", "region": "EU", "segment": "logistics",
+                "leadSource": "referral", "lastActivityAt": "2026-01-02T00:00:00Z"
+              }
+            },
+            {
+              "data": {
+                "name": "Nimbus Retail", "industry": "Retail", "annualRevenue": 980000, "employeeCount": 58,
+                "headquartersLocation": { "__type__": "geopoint", "latitude": 51.5, "longitude": -0.1 },
+                "billingContacts": [], "workspaceId": "ws_nimbus", "tier": "mid-market",
+                "createdAt": "2024-11-20T00:00:00Z", "status": "active", "totalDealsValue": 340000,
+                "churnRisk": "medium", "renewalDate": "2026-06-01", "accountManagerId": "ann",
+                "region": "EU", "segment": "retail", "preferredLanguage": "en", "npsScore": 8
+              }
+            }
+          ]
+        },
+        "deals": {
+          "documents": [
+            { "data": { "title": "Acme renewal", "ownerId": "ann", "ownerName": "Ann", "accountId": "acme", "accountName": "Acme Corp", "amount": 150000, "stage": "negotiation", "stageHistory": [{ "stage": "qualified", "at": "2025-11-01" }, { "stage": "negotiation", "at": "2026-01-10" }] } },
+            { "data": { "title": "Bolt onboarding", "ownerId": "bo", "ownerName": "Bo", "accountId": "bolt", "accountName": "Bolt Logistics", "amount": "15000", "stage": "closed-won" } },
+            { "data": { "title": "Nimbus expansion", "ownerId": "ann", "ownerName": "Ann", "accountId": "nimbus", "accountName": "Nimbus Retail", "amount": 60000, "stage": "proposal" } }
+          ]
+        },
+        "contacts": {
+          "documents": [
+            { "data": { "firstName": "Pat", "lastName": "Lee", "ownerId": "ann", "accountId": "acme" } },
+            { "data": { "firstName": "Jo", "lastName": "Kim", "ownerId": "bo", "accountId": "bolt" } }
+          ]
+        },
+        "contacts/*/notes": { "documents": [{ "data": { "authorId": "ann", "text": "Called re: renewal" } }] },
+        "contacts/*/callLogs": { "documents": [{ "data": { "duration": 312, "outcome": "voicemail" } }] },
+        "activities": { "documents": [{ "data": { "type": "email_sent", "contactId": "pat-lee", "at": "2026-01-10T00:00:00Z" } }] },
+        "customers": { "documents": [{ "data": { "stripeId": "cus_1", "email": "ann@example.com" } }] },
+        "products": { "documents": [{ "data": { "name": "Pro Plan", "active": true } }] },
+        "subscriptions": { "documents": [{ "data": { "status": "active", "customer": "cus_1" } }] },
+        "mail": { "documents": [] }
+      }
+    },
+    "list_functions": [
+      { "name": "onDealCreate", "eventTrigger": { "eventType": "google.cloud.firestore.document.v1.created" } },
+      { "name": "onAccountDelete", "eventTrigger": { "eventType": "google.cloud.firestore.document.v1.deleted" } },
+      { "name": "onContactPresenceChange", "eventTrigger": { "eventType": "google.firebase.database.ref.v1.written" } },
+      { "name": "generateInvoicePdf", "eventTrigger": { "eventType": "google.cloud.storage.object.v1.finalized" } },
+      { "name": "onUserSignupValidate", "eventTrigger": { "eventType": "providers/cloud.auth/eventTypes/user.beforeCreate" } },
+      { "name": "notifyOnNewLead", "eventTrigger": { "eventType": "google.cloud.pubsub.topic.v1.messagePublished" } },
+      { "name": "nightlyRollup", "triggerType": "scheduled" },
+      { "name": "getAccountSummary", "triggerType": "callable" },
+      { "name": "publicWebhook", "httpsTrigger": true },
+      { "name": "legacyFunctionXYZ" }
+    ],
+    "get_users": {
+      "users": [
+        { "uid": "ann", "email": "ann@example.com", "providerData": [{ "providerId": "password" }], "customClaims": { "role": "admin", "workspaceId": "ws_acme" } },
+        { "uid": "bo", "phoneNumber": "+15555550199", "providerData": [{ "providerId": "phone" }] },
+        { "uid": "cy", "providerData": [{ "providerId": "google.com" }] },
+        { "uid": "di", "providerData": [{ "providerId": "apple.com" }], "customClaims": { "role": "viewer" } }
+      ]
+    },
+    "get_data": {
+      "__byArg__": "path",
+      "values": {
+        "/presence": { "ann": { "online": true, "lastSeen": { "ts": 1, "device": { "os": "ios", "meta": { "build": 1, "nested": { "deep": true } } } } } },
+        "/legacy/sync": { "queue": { "item1": { "payload": { "nested": { "deeper": { "value": 1 } } } } } },
+        "default": {}
+      }
+    },
+    "get_template": {
+      "parameters": { "new_pipeline_ui": {}, "enable_ai_scoring": {}, "max_free_seats": {}, "show_legacy_reports": {}, "beta_billing_flow": {}, "regional_pricing": {} },
+      "conditions": [{ "name": "beta_users" }, { "name": "eu_region" }, { "name": "enterprise_tier" }]
+    },
+    "list_services": [{ "serviceId": "crm-service" }]
+  }
+}

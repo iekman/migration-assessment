@@ -24,16 +24,18 @@ import type { AssessmentReport, DimensionResult } from "./types.js";
 interface CliArgs {
   config?: string;
   mock: boolean;
+  fixtureData: string;
   out: string;
   format: "md" | "json" | "both";
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { mock: false, out: "report", format: "md" };
+  const args: CliArgs = { mock: false, fixtureData: "fixtures/mock-project.json", out: "report", format: "md" };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--config") args.config = argv[++i];
     else if (a === "--mock") args.mock = true;
+    else if (a === "--fixture-data") args.fixtureData = argv[++i];
     else if (a === "--out") args.out = argv[++i];
     else if (a === "--format") args.format = argv[++i] as CliArgs["format"];
     else if (a === "--help" || a === "-h") {
@@ -59,6 +61,9 @@ Options:
   --config <path>   Path to an AssessorConfig JSON file (see fixtures/mock-project.config.json
                      for the shape). Required.
   --mock            Use canned fixture data instead of spawning a real Firebase MCP server.
+  --fixture-data    Path to the canned MCP response data --mock serves (default:
+                     fixtures/mock-project.json). Swap this to demo a different scenario
+                     against the same --mock pipeline, e.g. fixtures/example-messy.json.
   --out <path>      Output file path without extension (default: "report").
   --format          "md" (default), "json", or "both".
 
@@ -83,7 +88,7 @@ async function main(): Promise<void> {
 
   const config: AssessorConfig = loadConfig(args.config);
   const client: IMcpClient = args.mock
-    ? new MockMcpClient(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "mock-project.json"))
+    ? new MockMcpClient(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", args.fixtureData))
     : new ReadOnlyMcpClient("firebase-mcp", config.mcpCommand, config.mcpArgs);
 
   if (client instanceof ReadOnlyMcpClient) {

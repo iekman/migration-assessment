@@ -1,0 +1,38 @@
+{
+  "responses": {
+    "get_project": { "displayName": "SimpleTodo" },
+    "list_apps": [{ "platform": "WEB", "appId": "1:222:web:simple" }],
+    "get_security_rules": {
+      "__byArg__": "type",
+      "values": {
+        "firestore": {
+          "source": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{db}/documents {\n    match /todos/{todoId} {\n      allow read, write: if request.auth.uid == resource.data.ownerId;\n      allow create: if request.auth.uid == request.resource.data.ownerId;\n    }\n  }\n}\n"
+        },
+        "storage": { "source": "rules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    match /{allPaths=**} {\n      allow read, write: if false;\n    }\n  }\n}\n" },
+        "database": { "source": "{\n  \"rules\": {\n    \".read\": false,\n    \".write\": false\n  }\n}\n" }
+      }
+    },
+    "query_collection": {
+      "__byArg__": "collection_path",
+      "values": {
+        "todos": {
+          "documents": [
+            { "data": { "title": "Buy milk", "done": false, "ownerId": "ann", "createdAt": "2026-01-05T10:00:00Z" } },
+            { "data": { "title": "Walk dog", "done": true, "ownerId": "ann", "createdAt": "2026-01-06T09:00:00Z" } },
+            { "data": { "title": "Pay rent", "done": false, "ownerId": "bo", "createdAt": "2026-01-07T08:00:00Z" } }
+          ]
+        }
+      }
+    },
+    "list_functions": [],
+    "get_users": {
+      "users": [
+        { "uid": "ann", "email": "ann@example.com", "providerData": [{ "providerId": "password" }] },
+        { "uid": "bo", "email": "bo@example.com", "providerData": [{ "providerId": "password" }] }
+      ]
+    },
+    "get_data": { "__byArg__": "path", "values": { "default": {} } },
+    "get_template": { "parameters": {}, "conditions": [] },
+    "list_services": []
+  }
+}

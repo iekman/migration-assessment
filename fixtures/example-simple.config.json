@@ -1,0 +1,14 @@
+{
+  "projectId": "simple-todo-example",
+  "firestoreCollections": ["todos"],
+  "knownSubcollections": {},
+  "denormalizedFields": [],
+  "sampleSize": 25,
+  "realtimeDatabasePaths": [],
+  "authSampleUids": ["ann", "bo"],
+  "multiTenant": false,
+  "installedExtensions": [],
+  "deploymentModel": "persistent",
+  "functionSideEffects": {},
+  "useServerpodOracle": false
+}

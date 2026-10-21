@@ -24,7 +24,8 @@ export function renderMarkdown(report: AssessmentReport): string {
   lines.push(`| Dimension | Score /10 |`);
   lines.push(`|---|---|`);
   for (const d of [...report.dimensions].sort((a, b) => b.score - a.score)) {
-    lines.push(`| ${d.dimension} | ${d.score.toFixed(1)} |`);
+    const note = d.score < 0 ? " (reduces the overall score — see below)" : "";
+    lines.push(`| ${d.dimension} | ${d.score.toFixed(1)}${note} |`);
   }
   lines.push("");
 

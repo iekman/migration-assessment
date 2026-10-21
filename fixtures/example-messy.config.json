@@ -1,0 +1,19 @@
+{
+  "projectId": "megacorp-crm-example",
+  "firestoreCollections": ["deals", "contacts", "customers", "products", "subscriptions", "mail"],
+  "knownSubcollections": { "contacts": ["callLogs"] },
+  "denormalizedFields": [
+    { "collection": "deals", "field": "ownerName", "sourceOfTruth": "users.displayName", "note": "kept in sync by a Cloud Function on user profile updates" }
+  ],
+  "sampleSize": 25,
+  "realtimeDatabasePaths": ["/presence", "/legacy/sync"],
+  "authSampleUids": ["ann", "bo", "cy", "di"],
+  "multiTenant": true,
+  "tenantIsolationNote": "separated only by a workspaceId field checked in Firestore rules and in Cloud Function code - no row-level enforcement at the database layer",
+  "installedExtensions": ["firestore-stripe-payments"],
+  "deploymentModel": "serverless",
+  "functionSideEffects": {
+    "onDealCreate": "recomputes the parent account's rolled-up deal totals and posts a notification to the deal owner's Slack channel via an outbound webhook"
+  },
+  "useServerpodOracle": false
+}

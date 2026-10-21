@@ -21,7 +21,7 @@ export async function collectDataConnect(client: IMcpClient): Promise<DimensionR
       findings.push({
         dimension: "dataconnect",
         severity: "low",
-        weight: -1, // negative weight: this REDUCES overall complexity
+        weight: -1.5, // negative: this REDUCES overall complexity, not adds to it
         summary: `${services.length} Data Connect service(s) in use`,
         detail:
           "Data Connect is already backed by Cloud SQL Postgres with a typed GraphQL schema. This is " +
@@ -30,6 +30,12 @@ export async function collectDataConnect(client: IMcpClient): Promise<DimensionR
           "The Firestore/RTDB findings above are the actual migration cost; this slice is comparatively cheap.",
         serverpodNote: "Port the GraphQL schema's types directly into Serverpod .spy.yaml model definitions.",
       });
+      // The dimension score itself carries the discount - scoreOverall()
+      // multiplies this by a fixed positive dimension weight, so a
+      // negative score here is what actually pulls the overall number
+      // down. A finding's own `weight` field is informational/display
+      // only; nothing reads it back for scoring.
+      return { dimension: "Data Connect -> Already Postgres", score: -1.5, findings };
     }
     return { dimension: "Data Connect -> Already Postgres", score: 0, findings };
   } catch {
