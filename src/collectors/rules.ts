@@ -1,32 +1,18 @@
 import { extractResultData, type IMcpClient } from "../firebaseMcpClient.js";
+import { parseCollectionTree } from "../rulesParser.js";
 import type { DimensionResult, Finding } from "../types.js";
 
 export interface RulesCollectorResult {
   dimension: DimensionResult;
   discoveredFirestoreCollections: string[];
+  /** parent -> subcollection names, parsed straight out of the rules text - ground truth, not a guess. */
+  discoveredSubcollections: Record<string, string[]>;
 }
 
 function extractRuleText(data: unknown): string {
   if (typeof data === "string") return data;
   const d = data as { source?: string; rules?: string; content?: string };
   return d.source ?? d.rules ?? d.content ?? JSON.stringify(data);
-}
-
-/** Pulls top-level collection names out of `match /name/{id} { ... }` style paths. */
-function scrapeCollectionNames(rulesText: string): string[] {
-  const names = new Set<string>();
-  const re = /match\s+\/(?:databases\/[^/]+\/documents\/)?([a-zA-Z0-9_-]+)\/\{/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(rulesText))) {
-    names.add(m[1]);
-  }
-  // The Firestore rules root is always `match /databases/{db}/documents { ... }`
-  // (note: no trailing slash before the opening brace of the wrapper itself,
-  // unlike nested `match /name/{id} {` rules) — the regex above can still
-  // pick up "databases" as a false-positive top-level "collection" from that
-  // wrapper line, so drop it explicitly.
-  names.delete("databases");
-  return [...names];
 }
 
 function countOccurrences(text: string, re: RegExp): number {
@@ -40,6 +26,8 @@ export async function collectRules(
 ): Promise<RulesCollectorResult> {
   const findings: Finding[] = [];
   let discoveredFirestoreCollections: string[] = [];
+  let discoveredSubcollections: Record<string, string[]> = {};
+  const allTenantHints = new Set<string>();
   let complexityPoints = 0;
 
   const toolName = await client.resolveToolName("get_security_rules", "core_get_security_rules");
@@ -56,6 +44,7 @@ export async function collectRules(
     return {
       dimension: { dimension: "Security Rules -> Authorization Logic", score: 5, findings },
       discoveredFirestoreCollections,
+      discoveredSubcollections,
     };
   }
 
@@ -65,7 +54,18 @@ export async function collectRules(
       const text = extractRuleText(extractResultData(result));
 
       if (type === "firestore") {
-        discoveredFirestoreCollections = scrapeCollectionNames(text);
+        const parsed = parseCollectionTree(text);
+        discoveredFirestoreCollections = parsed.topLevelCollections;
+        discoveredSubcollections = parsed.subcollections;
+        for (const hint of parsed.tenantHints) allTenantHints.add(hint);
+      } else {
+        // storage/database rules don't have Firestore-style collection
+        // nesting, but can still reference tenant-like fields in conditions.
+        for (const m of text.matchAll(
+          /\b(tenantId|tenant_id|orgId|org_id|organizationId|organization_id|workspaceId|workspace_id|accountId|account_id|companyId|company_id)\b/g,
+        )) {
+          allTenantHints.add(m[0]);
+        }
       }
 
       const getExistsCalls = countOccurrences(text, /\b(get|exists|getAfter)\s*\(/g);
@@ -144,12 +144,26 @@ export async function collectRules(
       weight: 2.5,
       summary: "Project is multi-tenant (user-confirmed)",
       detail:
-        (tenantIsolationNote
-          ? `Tenant isolation today: ${tenantIsolationNote}. `
-          : "") +
+        (tenantIsolationNote ? `Tenant isolation today: ${tenantIsolationNote}. ` : "") +
         "Every future query and endpoint needs tenant scoping rebuilt explicitly — there's no " +
         "equivalent to rules-enforced tenant isolation, so a missed check is a cross-tenant data " +
         "leak rather than a cosmetic bug. Budget real review time here, not just porting time.",
+    });
+  } else if (allTenantHints.size > 0) {
+    // We didn't ask and get told "yes" — we noticed something and should
+    // say so before asking, rather than posing multiTenant as a blind
+    // yes/no question the user has to research from scratch.
+    complexityPoints += 1; // small, unconfirmed bump - full weight only applies once confirmed above
+    findings.push({
+      dimension: "security-rules",
+      severity: "medium",
+      weight: 1,
+      summary: `Suspected multi-tenancy: rules reference ${[...allTenantHints].join(", ")}`,
+      detail:
+        "Not confirmed — this is a pattern match on field/claim names in the rules text, not a " +
+        "declaration of intent. If this project does serve multiple customer orgs from one " +
+        'project, set "multiTenant": true (and ideally "tenantIsolationNote") in config to turn ' +
+        "this into a fully-weighted finding; if these fields mean something else here, ignore it.",
     });
   }
 
@@ -157,5 +171,6 @@ export async function collectRules(
   return {
     dimension: { dimension: "Security Rules -> Authorization Logic", score, findings },
     discoveredFirestoreCollections,
+    discoveredSubcollections,
   };
 }

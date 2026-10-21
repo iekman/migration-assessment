@@ -1,7 +1,7 @@
 {
   "projectId": "acme-notes-mock",
-  "firestoreCollections": ["users", "notes"],
-  "knownSubcollections": { "notes": ["comments"] },
+  "firestoreCollections": ["users", "notes", "mail"],
+  "knownSubcollections": {},
   "denormalizedFields": [
     { "collection": "notes", "field": "ownerDisplayName", "sourceOfTruth": "users.displayName", "note": "kept in sync by a Cloud Function on user profile updates" }
   ],

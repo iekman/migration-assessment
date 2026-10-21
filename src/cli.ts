@@ -98,16 +98,36 @@ async function main(): Promise<void> {
     const rulesResult = await collectRules(client, config.multiTenant, config.tenantIsolationNote);
     const seedCollections = [...new Set([...config.firestoreCollections, ...rulesResult.discoveredFirestoreCollections])];
 
+    // Subcollections parsed straight out of the rules text are ground
+    // truth — merge them with anything hand-supplied in config (union per
+    // parent) so the user never has to re-type what the rules already
+    // told us, and only needs knownSubcollections for the genuinely
+    // undiscoverable case (a subcollection with no explicit rule of its own).
+    const effectiveSubcollections: Record<string, string[]> = {};
+    for (const parent of new Set([...Object.keys(config.knownSubcollections), ...Object.keys(rulesResult.discoveredSubcollections)])) {
+      effectiveSubcollections[parent] = [
+        ...new Set([...(config.knownSubcollections[parent] ?? []), ...(rulesResult.discoveredSubcollections[parent] ?? [])]),
+      ];
+    }
+
+    const { dimension: firestoreDimension } = await collectFirestore(
+      client,
+      seedCollections,
+      effectiveSubcollections,
+      config.denormalizedFields,
+      config.sampleSize,
+    );
+
     const dimensions: DimensionResult[] = [
       rulesResult.dimension,
-      await collectFirestore(client, seedCollections, config.knownSubcollections, config.denormalizedFields, config.sampleSize),
+      firestoreDimension,
       await collectFunctions(client, config.deploymentModel, config.functionSideEffects),
       await collectAuth(client, config.authSampleUids),
       await collectRealtimeDatabase(client, config.realtimeDatabasePaths),
       await collectRemoteConfig(client),
       await collectDataConnect(client),
       assessStorage(),
-      collectUserContext(config),
+      collectUserContext(config, seedCollections),
     ];
 
     const { overallScore, band } = scoreOverall(dimensions);

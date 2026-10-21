@@ -36,29 +36,44 @@ Given those constraints, this tool:
    `create_`, `delete_`, `deploy`, `send_`, `login`, `init`, ...) or an
    explicit denylist entry (`dataconnect_execute`). Defense in depth,
    not a substitute for real IAM scoping — see "Real usage" below.
-2. Reads `firestore.rules` / `storage.rules` / `database.rules`, scrapes
-   `match /name/{id}` paths out of the Firestore rules text to
-   auto-discover likely top-level collections, and flags cross-document
-   `get()`/`exists()` calls (relational authorization logic baked into
-   rules — no Serverpod equivalent).
+2. Reads `firestore.rules` / `storage.rules` / `database.rules` and parses
+   the Firestore rules text with a real brace-depth-aware scanner
+   (`src/rulesParser.ts`) — not a flat regex sweep — to build an actual
+   collection/subcollection tree. It understands both ways Firestore rules
+   nest a subcollection (a `match` block physically nested inside another,
+   and the flat `match /parent/{id}/child/{id2}` single-header form), and
+   flags cross-document `get()`/`exists()` calls (relational authorization
+   logic baked into rules — no Serverpod equivalent) along the way.
 3. Samples each Firestore collection (config-seeded ∪ rules-discovered),
-   plus any subcollections you name in `knownSubcollections` (nothing
-   discovers these on its own), and infers a field-shape summary:
-   reference fields, GeoPoints, array-of-map fields, and cross-document
-   schema drift.
+   plus every subcollection the parser found nested under it — merged
+   with anything you additionally name in `knownSubcollections`, which is
+   now only needed for a subcollection that carries no explicit rule of
+   its own (nothing can discover those) — and infers a field-shape
+   summary: reference fields, GeoPoints, array-of-map fields, and
+   cross-document schema drift. It also flags *suspected* denormalized
+   fields on its own (an `xId` field alongside an `xDisplayName`/`xName`/
+   etc. sibling), at low confidence, distinct from a `denormalizedFields`
+   entry you've confirmed in config — confirming or dismissing a
+   suspicion never produces a duplicate finding.
 4. Lists Cloud Functions and classifies each by trigger type — from
    structured metadata when available, otherwise a naming-convention
    guess — unless you've described its real side effects in
-   `functionSideEffects`, which always wins over the guess.
+   `functionSideEffects`, which always wins over the guess, and names
+   the specific functions still worth filling in.
 5. Samples Auth users by uid for provider mix and custom-claims usage.
 6. Samples Realtime Database paths for nesting depth, if configured.
 7. Reads the Remote Config template for feature-flag/targeting complexity.
 8. Checks for Data Connect services — a positive signal (already
    Postgres + GraphQL) rather than a cost.
-9. Folds in everything no MCP tool can ever see: denormalized fields,
-   multi-tenancy, installed Firebase Extensions, and target deployment
-   model (serverless vs. persistent — this changes whether Serverpod's
-   `FutureCall` scheduling is even available).
+9. Folds in everything no MCP tool can ever see, surfacing a suspicion
+   wherever there's a pattern to go on instead of asking blind: scans
+   rules text and sampled fields for tenant/org-like identifiers (a
+   multi-tenancy hint), matches sampled collection names against a small
+   curated list of default collections several common Firebase
+   Extensions create, and reads `deploymentModel` (serverless vs.
+   persistent — this changes whether Serverpod's `FutureCall` scheduling
+   is even available) and `multiTenant`/`installedExtensions` once
+   you've confirmed them.
 10. Weights everything into an overall 0–10 score and writes a Markdown
     and/or JSON report.
 
@@ -134,13 +149,16 @@ npm run mock
   or discoverable in the rules text is invisible to this report.
 - No Cloud Functions source-read tool — trigger classification is a
   best-effort guess from naming unless overridden by `functionSideEffects`.
-- The rules-text collection scraper is naive regex matching, not a real
-  parser — it doesn't track nesting depth, so a collection name nested
-  under another collection (e.g. `notes/{id}/comments/{id}`) also gets
-  scraped as if it were top-level, and gets sampled (harmlessly, as an
-  empty result) at the wrong path. Known cosmetic noise, not a
-  correctness issue — cross-check anything scraped against your own
-  knowledge of the schema.
+- The rules parser (`src/rulesParser.ts`) is brace-depth-aware and handles
+  both subcollection nesting forms, but it still only understands `match`
+  path nesting — not the rules expression language. A subcollection with
+  no explicit rule of its own (inheriting access, or unprotected) leaves
+  nothing in the text to find; that's inherent, not a parser limitation,
+  and is why `knownSubcollections` in config still exists as a fallback.
+- Denormalized-field, multi-tenancy, and installed-Extension detection
+  are pattern matches on naming conventions, not certainty — each one is
+  surfaced as a low-confidence "suspected" finding that invites
+  confirmation (or dismissal) in config, never silently assumed true.
 - Sampling is capped (`sampleSize` in the config) — rare field shapes
   outside the sample won't be caught.
 - The overall score and dimension weights (`src/scoring.ts`) are

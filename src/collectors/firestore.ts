@@ -1,6 +1,6 @@
 import { extractResultData, type IMcpClient } from "../firebaseMcpClient.js";
 import { inferCollectionShape, polymorphicFields } from "../schemaInference.js";
-import type { DimensionResult, Finding } from "../types.js";
+import type { DimensionResult, Finding, FirestoreCollectionShape } from "../types.js";
 import type { DenormalizedField } from "../config.js";
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -21,15 +21,49 @@ function extractDocs(data: unknown): Array<Record<string, unknown>> {
   });
 }
 
+const COPY_SUFFIXES = ["DisplayName", "Name", "Title", "Email", "Avatar", "Photo", "Username"];
+
+/**
+ * Heuristic, not a fact: a field named "<x>Id" alongside a sibling field
+ * named "<x>DisplayName"/"<x>Name"/etc in the SAME document commonly means
+ * the sibling is a denormalized copy kept in sync by a Cloud Function,
+ * rather than something owned by this collection. We can't know the real
+ * source of truth from one collection's shape alone, so this is surfaced
+ * as a candidate to confirm (and given a fraction of the weight a
+ * user-confirmed denormalizedFields entry gets), not asserted as fact.
+ */
+function suspectDenormalizedFields(
+  shape: FirestoreCollectionShape,
+  alreadyConfirmed: Set<string>,
+): Array<{ field: string; likelyIdField: string }> {
+  const fieldNames = [...shape.fields.keys()];
+  const out: Array<{ field: string; likelyIdField: string }> = [];
+  for (const idField of fieldNames) {
+    const m = /^(.+)Id$/.exec(idField);
+    if (!m) continue;
+    const prefix = m[1];
+    for (const suffix of COPY_SUFFIXES) {
+      const candidate = `${prefix}${suffix}`;
+      const hit = fieldNames.find((f) => f.toLowerCase() === candidate.toLowerCase());
+      if (hit && !alreadyConfirmed.has(`${shape.name}.${hit}`)) {
+        out.push({ field: hit, likelyIdField: idField });
+      }
+    }
+  }
+  return out;
+}
+
 export async function collectFirestore(
   client: IMcpClient,
   collections: string[],
   knownSubcollections: Record<string, string[]>,
   denormalizedFields: DenormalizedField[],
   sampleSize: number,
-): Promise<DimensionResult> {
+): Promise<{ dimension: DimensionResult; shapes: Map<string, FirestoreCollectionShape> }> {
   const findings: Finding[] = [];
+  const shapes = new Map<string, FirestoreCollectionShape>();
   let complexityPoints = 0;
+  const confirmed = new Set(denormalizedFields.map((d) => `${d.collection}.${d.field}`));
 
   if (collections.length === 0) {
     findings.push({
@@ -42,7 +76,7 @@ export async function collectFirestore(
         "collections on its own. Pass --collections or let the security-rules scrape find them; " +
         "otherwise this dimension is not assessed.",
     });
-    return { dimension: "Firestore Schema -> Relational Schema", score: 5, findings };
+    return { dimension: { dimension: "Firestore Schema -> Relational Schema", score: 5, findings }, shapes };
   }
 
   const toolName = await client.resolveToolName("firestore_query_collection", "query_collection");
@@ -54,11 +88,13 @@ export async function collectFirestore(
       summary: "query_collection tool not found on MCP server",
       detail: "Could not sample any collection.",
     });
-    return { dimension: "Firestore Schema -> Relational Schema", score: 5, findings };
+    return { dimension: { dimension: "Firestore Schema -> Relational Schema", score: 5, findings }, shapes };
   }
 
-  // Build the full sampling plan: top-level collections, plus any
-  // subcollections the user told us about (never discoverable via MCP).
+  // Full sampling plan: top-level collections, plus subcollections -
+  // whether discovered straight out of the rules text (ground truth,
+  // already merged into knownSubcollections by the caller) or hand-supplied
+  // in config for ones with no explicit rule to parse.
   const plan: Array<{ path: string; label: string; parent?: string }> = [];
   for (const name of collections) {
     plan.push({ path: name, label: name });
@@ -69,10 +105,7 @@ export async function collectFirestore(
 
   for (const item of plan) {
     try {
-      const result = await client.callReadOnlyTool(toolName, {
-        collection_path: item.path,
-        limit: sampleSize,
-      });
+      const result = await client.callReadOnlyTool(toolName, { collection_path: item.path, limit: sampleSize });
       const docs = extractDocs(extractResultData(result));
       if (docs.length === 0) {
         findings.push({
@@ -86,6 +119,7 @@ export async function collectFirestore(
       }
 
       const shape = inferCollectionShape(item.label, docs);
+      shapes.set(item.label, shape);
       const drift = polymorphicFields(shape);
       const notes: string[] = [];
 
@@ -122,16 +156,35 @@ export async function collectFirestore(
             : `Model "${item.label}" as a straightforward Serverpod class — generated table should be close to 1:1.`,
       });
 
+      const suspects = suspectDenormalizedFields(shape, confirmed);
+      for (const s of suspects) {
+        complexityPoints += 0.5; // smaller than a confirmed entry (+1) - this is a guess, not ground truth
+        findings.push({
+          dimension: "firestore-schema",
+          severity: "low",
+          weight: 0.5,
+          summary: `Suspected denormalized field: "${item.label}.${s.field}" (user-confirmed subcollections and denormalizedFields entries always suppress this)`,
+          detail:
+            `Sits alongside "${s.likelyIdField}" in the same document — a common Firestore pattern ` +
+            `for avoiding a join by copying the referenced entity's name/title/email at write time. ` +
+            `Not confirmed: if this is right, add an entry to denormalizedFields in config — ` +
+            `{ collection: "${item.label}", field: "${s.field}", sourceOfTruth: "<collection ${s.likelyIdField} points at>.<field>" } ` +
+            `— to turn this into a full-weight finding with the real sync-logic warning attached; ` +
+            `if it's not a copy, ignore it.`,
+        });
+      }
+
       if (!item.parent && !knownSubcollections[item.label]) {
         findings.push({
           dimension: "firestore-schema",
           severity: "low",
           weight: 0.5,
-          summary: `Collection "${item.label}": subcollections cannot be detected via MCP`,
+          summary: `Collection "${item.label}": no subcollections found in rules text`,
           detail:
-            "No Firestore MCP tool lists subcollections, and none were named in config for this " +
-            "collection. If it has subcollections in the console, they are invisible to this " +
-            "assessor and must be enumerated manually — or added to knownSubcollections in config.",
+            "The rules-text parser found none nested under this collection, and none were named in " +
+            "knownSubcollections either. If it has subcollections that carry no explicit rule of " +
+            "their own (inheriting access from elsewhere, or unprotected), nothing can detect them — " +
+            "add them to knownSubcollections in config if you know of any.",
         });
       }
     } catch (err) {
@@ -161,9 +214,5 @@ export async function collectFirestore(
     });
   }
 
-  return {
-    dimension: "Firestore Schema -> Relational Schema",
-    score: Math.min(10, complexityPoints),
-    findings,
-  };
+  return { dimension: { dimension: "Firestore Schema -> Relational Schema", score: Math.min(10, complexityPoints), findings }, shapes };
 }

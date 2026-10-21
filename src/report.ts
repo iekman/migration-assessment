@@ -65,9 +65,15 @@ export function renderMarkdown(report: AssessmentReport): string {
       "anything about an existing Serverpod project, only general Serverpod guidance.",
   );
   lines.push(
-    "- Several things have no MCP signal at all and are only in this report if you put them in " +
-      "config: subcollections, denormalized fields, multi-tenancy, installed Extensions, deployment " +
-      "model, and per-function side effects.",
+    "- Subcollections are now auto-discovered from the rules text when they carry an explicit rule " +
+      "(block-nested or flat multi-segment form) — knownSubcollections in config is only needed for " +
+      "ones with no rule of their own to parse.",
+  );
+  lines.push(
+    "- Denormalized fields, multi-tenancy, installed Extensions, and per-function side effects get " +
+      "a best-effort, lower-confidence suspicion surfaced automatically where there's a pattern to " +
+      "go on (see any \"Suspected ...\" finding above) — but still need config confirmation to count " +
+      "at full weight, since a pattern match isn't proof.",
   );
 
   return lines.join("\n");

@@ -126,21 +126,22 @@ export async function collectFunctions(
         });
       } else if (trigger.endsWith("-trigger")) {
         complexityPoints += count * 3;
+        const names = classified.filter((f) => f.triggerType === trigger).map((f) => f.name);
         findings.push({
           dimension: "functions",
           severity: "high",
           weight: count * 3,
-          summary: `${count} ${trigger.replace("-trigger", "")} background-trigger function(s)`,
+          summary: `${count} ${trigger.replace("-trigger", "")} background-trigger function(s): ${names.join(", ")}`,
           detail:
             "Firestore/RTDB/Auth/Storage triggers auto-fire on writes with no direct Serverpod " +
             "equivalent. Each one has to become explicit application code: called from the write " +
             "path (the Serverpod endpoint or repository method that performs the equivalent write) " +
             "since there's no database-level change-trigger to hook into out of the box.",
           serverpodNote:
-            "Highest-risk category: audit each trigger for side effects (emails, other writes, " +
-            "cascading deletes) and hand-place the equivalent calls in the corresponding endpoint(s). " +
-            "Filling in functionSideEffects in config for these functions turns this guess into a " +
-            "ground-truth finding above.",
+            `Highest-risk category: audit each of ${names.join(", ")} for side effects (emails, ` +
+            "other writes, cascading deletes) and hand-place the equivalent calls in the " +
+            `corresponding endpoint(s). Add functionSideEffects entries for ${names.join(", ")} to ` +
+            "turn this guess into a ground-truth finding above, one function at a time.",
         });
       } else {
         complexityPoints += count * 1;

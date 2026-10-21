@@ -10,7 +10,7 @@
       "__byArg__": "type",
       "values": {
         "firestore": {
-          "source": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{db}/documents {\n    function isOwner(uid) { return request.auth.uid == uid; }\n    match /users/{uid} {\n      allow read, write: if isOwner(uid);\n    }\n    match /notes/{noteId} {\n      allow read: if resource.data.ownerId == request.auth.uid || exists(/databases/$(db)/documents/shares/$(noteId + '_' + request.auth.uid));\n      allow write: if get(/databases/$(db)/documents/users/$(request.auth.uid)).data.plan == 'pro';\n      match /comments/{commentId} {\n        allow read, write: if isOwner(resource.data.authorId);\n      }\n    }\n  }\n}\n"
+          "source": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{db}/documents {\n    function isOwner(uid) { return request.auth.uid == uid; }\n    match /users/{uid} {\n      allow read, write: if isOwner(uid);\n    }\n    match /notes/{noteId} {\n      allow read: if resource.data.ownerId == request.auth.uid || resource.data.orgId == request.auth.token.orgId || exists(/databases/$(db)/documents/shares/$(noteId + '_' + request.auth.uid));\n      allow write: if get(/databases/$(db)/documents/users/$(request.auth.uid)).data.plan == 'pro';\n      match /comments/{commentId} {\n        allow read, write: if isOwner(resource.data.authorId);\n      }\n    }\n    match /notes/{noteId}/attachments/{attachmentId} {\n      allow read, write: if isOwner(resource.data.uploadedBy);\n    }\n  }\n}\n"
         },
         "storage": {
           "source": "rules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    match /avatars/{uid} {\n      allow read: if true;\n      allow write: if request.auth.uid == uid;\n    }\n  }\n}\n"
@@ -35,13 +35,15 @@
                 "title": "Groceries",
                 "ownerId": "ann",
                 "ownerDisplayName": "Ann",
+                "authorId": "ann",
+                "authorName": "Ann",
                 "tags": ["home", "urgent"],
                 "location": { "__type__": "geopoint", "latitude": 52.5, "longitude": 13.4 },
                 "collaborators": [{ "uid": "bo", "role": "editor" }, { "uid": "cy", "role": "viewer" }]
               }
             },
-            { "data": { "title": "Trip plan", "ownerId": "bo", "ownerDisplayName": "Bo", "tags": ["travel"], "budget": 500 } },
-            { "data": { "title": "Legacy note", "ownerId": "ann", "ownerDisplayName": "Ann", "budget": "unknown" } }
+            { "data": { "title": "Trip plan", "ownerId": "bo", "ownerDisplayName": "Bo", "authorId": "bo", "authorName": "Bo", "tags": ["travel"], "budget": 500 } },
+            { "data": { "title": "Legacy note", "ownerId": "ann", "ownerDisplayName": "Ann", "authorId": "ann", "authorName": "Ann", "budget": "unknown" } }
           ]
         },
         "notes/*/comments": {
@@ -49,7 +51,11 @@
             { "data": { "authorId": "bo", "text": "lgtm" } },
             { "data": { "authorId": "ann", "text": "thanks!" } }
           ]
-        }
+        },
+        "notes/*/attachments": {
+          "documents": [{ "data": { "uploadedBy": "ann", "url": "https://example.com/a.png" } }]
+        },
+        "mail": { "documents": [] }
       }
     },
     "list_functions": [
