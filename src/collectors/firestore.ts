@@ -2,6 +2,7 @@ import { extractResultData, type IMcpClient } from "../firebaseMcpClient.js";
 import { inferCollectionShape, polymorphicFields } from "../schemaInference.js";
 import type { DimensionResult, Finding, FirestoreCollectionShape } from "../types.js";
 import type { DenormalizedField } from "../config.js";
+import { pluralize } from "../text.js";
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -135,7 +136,7 @@ export async function collectFirestore(
       const nullableFields = [...shape.fields.entries()].filter(([, f]) => f.nullable).map(([name]) => name);
       if (nullableFields.length > 0) {
         complexityPoints += 0.5;
-        notes.push(`has nullable field(s) (${nullableFields.join(", ")}) - these need a nullable Dart type and no NOT NULL constraint, rather than assuming every field is always present`);
+        notes.push(`has ${pluralize(nullableFields.length, "nullable field")} (${nullableFields.join(", ")}) - these need a nullable Dart type and no NOT NULL constraint, rather than assuming every field is always present`);
       }
       if (shape.hasArrayOfMapFields) {
         complexityPoints += 1.5;
@@ -209,7 +210,7 @@ export async function collectFirestore(
           severity: "medium",
           weight: 1,
           uncertaintyCategory: "deep-sampling-limit",
-          summary: `Collection "${item.label}" has its own subcollection(s) (${deeperChildren.join(", ")}) that this run did not sample`,
+          summary: `Collection "${item.label}" has ${pluralize(deeperChildren.length, "subcollection of its own", "subcollections of its own")} (${deeperChildren.join(", ")}) that this run did not sample`,
           detail:
             "Discovered from the rules text, two levels deep - sampling only walks one level down " +
             "from each top-level seed collection, so this data's shape is genuinely unknown, not " +

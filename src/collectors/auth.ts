@@ -1,5 +1,6 @@
 import { extractResultData, type IMcpClient } from "../firebaseMcpClient.js";
 import type { DimensionResult, Finding } from "../types.js";
+import { pluralize } from "../text.js";
 
 interface UserRecord {
   providerData?: Array<{ providerId?: string }>;
@@ -48,7 +49,7 @@ export async function collectAuth(client: IMcpClient, sampleUids: string[]): Pro
         severity: "medium",
         weight: 1,
         uncertaintyCategory: "empty-sample",
-        summary: `Requested ${sampleUids.length} user(s), got 0 back`,
+        summary: `Requested ${pluralize(sampleUids.length, "user")}, got 0 back`,
         detail:
           "Either the UIDs in authSampleUids are wrong/stale (e.g. users since deleted), or this " +
           "project genuinely has no users yet. Either way, nothing was learned about provider mix " +

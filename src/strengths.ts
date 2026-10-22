@@ -1,4 +1,5 @@
 import type { AssessmentReport } from "./types.js";
+import { pluralize } from "./text.js";
 
 /**
  * Derives genuine, project-specific reasons a move to Serverpod pays off,
@@ -41,11 +42,11 @@ export function deriveServerpodStrengths(report: AssessmentReport): string[] {
   );
 
   const bgTriggerCount = allFindings
-    .filter((f) => f.dimension === "functions" && /^\d+ \w+ background-trigger function\(s\)/.test(f.summary))
+    .filter((f) => f.dimension === "functions" && /^\d+ \w+ background-trigger functions?:/.test(f.summary))
     .reduce((sum, f) => sum + Number(f.summary.match(/^(\d+)/)?.[1] ?? 0), 0);
   strengths.push(
     bgTriggerCount > 0
-      ? `This project has ${bgTriggerCount} background-triggered function(s) today. Each one is a ` +
+      ? `This project has ${pluralize(bgTriggerCount, "background-triggered function")} today. Each one is a ` +
         "separate billed invocation stacked on top of the write that triggered it - a classic source " +
         "of Firebase's per-operation costs climbing faster than usage actually grows, since one user " +
         "action can cascade into several billed events instead of one. In Serverpod, the equivalent " +
@@ -67,7 +68,7 @@ export function deriveServerpodStrengths(report: AssessmentReport): string[] {
     );
   }
 
-  const hasSimpleFunctions = allFindings.some((f) => /\d+ (https|callable) function\(s\)/.test(f.summary));
+  const hasSimpleFunctions = allFindings.some((f) => /^\d+ (https|callable) functions?$/.test(f.summary));
   if (hasSimpleFunctions) {
     strengths.push(
       "Your request/response-style functions port close to one-to-one onto Serverpod endpoint " +
@@ -92,13 +93,6 @@ export function deriveServerpodStrengths(report: AssessmentReport): string[] {
         "transactions Firestore doesn't offer natively.",
     );
   }
-
-  strengths.push(
-    "Serverpod's own tooling has matured quickly: the current release added full-stack hot reload " +
-      "and a zero-setup embedded Postgres for local development, so your team spends its first days " +
-      "writing code, not fighting infrastructure. (It's a young major version - expect some rough " +
-      "edges as it stabilizes, same as any fast-moving framework.)",
-  );
 
   return strengths;
 }

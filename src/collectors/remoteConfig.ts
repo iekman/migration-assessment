@@ -1,5 +1,6 @@
 import { extractResultData, type IMcpClient } from "../firebaseMcpClient.js";
 import type { DimensionResult, Finding } from "../types.js";
+import { pluralize } from "../text.js";
 
 export async function collectRemoteConfig(client: IMcpClient): Promise<DimensionResult> {
   const findings: Finding[] = [];
@@ -35,7 +36,7 @@ export async function collectRemoteConfig(client: IMcpClient): Promise<Dimension
       dimension: "remote-config",
       severity: conditionCount > 0 ? "medium" : "low",
       weight: 1,
-      summary: `${paramCount} parameter(s), ${conditionCount} targeting condition(s)`,
+      summary: `${pluralize(paramCount, "parameter")}, ${pluralize(conditionCount, "targeting condition")}`,
       detail:
         conditionCount > 0
           ? "Conditional/targeted rollout logic (percentage rollouts, audience conditions) has no " +

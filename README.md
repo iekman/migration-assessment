@@ -311,12 +311,16 @@ each for a different reader:
    static "known blind spots" list with this project's actual open
    questions (`src/unknowns.ts`), grouped by kind. Each group states what's
    unknown, *when* you'd likely discover the surprise if it's left
-   unresolved, and the fastest way to close it — populated only with
-   categories that actually have instances this run, never the full
-   taxonomy regardless of relevance. Ends with a one-line "biggest
-   remaining uncertainty" call-out, by total severity-weighted instance
-   count. Written for whoever is deciding what to do before kickoff, not
-   necessarily an engineer.
+   unresolved, and the fastest way to close it, with its specific
+   instances underneath as a single, continuously-numbered checklist
+   (`- [ ] 1.`, `2.`, ... straight through every group, not restarting per
+   group) — each item worded to stand alone, so a non-technical reader can
+   copy any one line directly into a ticket without needing the
+   surrounding prose. Populated only with categories that actually have
+   instances this run, never the full taxonomy regardless of relevance.
+   Ends with a one-line "biggest remaining uncertainty" call-out, by total
+   severity-weighted instance count. Written for whoever is deciding what
+   to do before kickoff, not necessarily an engineer.
 4. **Detailed findings** — the full per-dimension technical record
    everything above is derived from, for whoever actually scopes or
    implements the migration.
@@ -365,8 +369,21 @@ src/
   schemaInference.ts       Firestore document shape inference
   scoring.ts                dimension weighting -> overall score/band
   report.ts                  Markdown/JSON rendering, layered by audience (see above)
-  strengths.ts                data-driven "why Serverpod fits" bullets for the executive summary
-  unknowns.ts                  per-project "what needs confirming" groups, replacing static boilerplate
+  strengths.ts                data-driven "why Serverpod fits" bullets for the executive summary -
+                              keep to infrastructure/cost/ownership claims, not dev-tooling-quality
+                              or marketing language (a "tooling has matured" bullet was cut for
+                              exactly this). WARNING: its conditional bullets detect project signals
+                              by pattern-matching other collectors' finding.summary text - this is
+                              fragile by nature (confirmed: a pluralization pass once silently broke
+                              two of its regexes with no type error, since both sides are just
+                              strings) and scripts/test-real-world.mjs's Suite 3 exists specifically
+                              to catch that class of regression by running the real pipeline, not a
+                              reimplementation of it - extend that suite's expectations rather than
+                              trusting a new conditional bullet by inspection alone.
+  unknowns.ts                  per-project "what needs confirming" groups, replacing static
+                              boilerplate - deliberately NOT string-matching (see Finding.uncertaintyCategory
+                              in types.ts, set explicitly at each collector's finding-creation site);
+                              prefer that pattern over strengths.ts's for any new derivation.
   serverpodOracle.ts         optional serverpod_mcp Q&A enrichment
   collectors/                one file per Firebase surface, plus userContext.ts
                               for config-only signals (extensions, multi-tenancy,

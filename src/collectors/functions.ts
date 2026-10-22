@@ -1,6 +1,7 @@
 import { extractResultData, type IMcpClient } from "../firebaseMcpClient.js";
 import type { DimensionResult, Finding } from "../types.js";
 import type { AssessorConfig } from "../config.js";
+import { pluralize } from "../text.js";
 
 export interface FunctionInfo {
   name: string;
@@ -131,7 +132,7 @@ export async function collectFunctions(
           dimension: "functions",
           severity: "low",
           weight: count * 0.5,
-          summary: `${count} ${trigger} function(s)`,
+          summary: pluralize(count, `${trigger} function`),
           detail: "These map fairly directly onto Serverpod endpoint methods (request/response shape changes, logic mostly ports as-is).",
           serverpodNote: "One Serverpod endpoint method per function; move the handler body largely unchanged.",
         });
@@ -147,7 +148,7 @@ export async function collectFunctions(
           dimension: "functions",
           severity: deploymentModel === "serverless" ? "high" : "medium",
           weight: count * 1.5,
-          summary: `${count} scheduled (cron) function(s)`,
+          summary: pluralize(count, "scheduled (cron) function"),
           detail:
             "Serverpod has a future-call/cron-style scheduling mechanism, but the schedule + retry " +
             "semantics need re-declaring, not just moving code." +
@@ -169,7 +170,7 @@ export async function collectFunctions(
           severity: "high",
           weight: count * 3,
           uncertaintyCategory: "function-behavior-unknown",
-          summary: `${count} ${trigger.replace("-trigger", "")} background-trigger function(s): ${names.join(", ")}`,
+          summary: `${pluralize(count, `${trigger.replace("-trigger", "")} background-trigger function`)}: ${names.join(", ")}`,
           detail:
             "Firestore/RTDB/Auth/Storage triggers auto-fire on writes, and Pub/Sub triggers auto-fire " +
             "on a published message - none have a direct Serverpod equivalent. Each one has to become " +
@@ -180,7 +181,7 @@ export async function collectFunctions(
           serverpodNote:
             `Highest-risk category: audit each of ${names.join(", ")} for side effects (emails, ` +
             "other writes, cascading deletes) and hand-place the equivalent calls in the " +
-            `corresponding endpoint(s). Add functionSideEffects entries for ${names.join(", ")} to ` +
+            `corresponding endpoint for each. Add functionSideEffects entries for ${names.join(", ")} to ` +
             "turn this guess into a ground-truth finding above, one function at a time.",
         });
       } else {
@@ -190,7 +191,7 @@ export async function collectFunctions(
           severity: "medium",
           weight: count * 1,
           uncertaintyCategory: "function-behavior-unknown",
-          summary: `${count} function(s) with undetermined trigger type`,
+          summary: `${pluralize(count, "function")} with undetermined trigger type`,
           detail: `Names: ${classified.filter((f) => f.triggerType === trigger && !functionSideEffects[f.name]).map((f) => f.name).join(", ")}. list_functions didn't expose structured trigger metadata in this server version — verify manually, or fill in functionSideEffects in config.`,
         });
       }

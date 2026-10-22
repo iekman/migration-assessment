@@ -1,5 +1,6 @@
 import { extractResultData, type IMcpClient } from "../firebaseMcpClient.js";
 import type { DimensionResult, Finding } from "../types.js";
+import { pluralize } from "../text.js";
 
 export async function collectDataConnect(client: IMcpClient): Promise<DimensionResult> {
   const toolName = await client.resolveToolName("dataconnect_list_services", "list_services");
@@ -22,7 +23,7 @@ export async function collectDataConnect(client: IMcpClient): Promise<DimensionR
         dimension: "dataconnect",
         severity: "low",
         weight: -1.5, // negative: this REDUCES overall complexity, not adds to it
-        summary: `${services.length} Data Connect service(s) in use`,
+        summary: `${pluralize(services.length, "Data Connect service")} in use`,
         detail:
           "Data Connect is already backed by Cloud SQL Postgres with a typed GraphQL schema. This is " +
           "the single best migration signal in the whole assessment: the data model is already " +

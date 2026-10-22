@@ -20,6 +20,7 @@ import { scoreOverall } from "./scoring.js";
 import { renderMarkdown, renderJson } from "./report.js";
 import { enrichWithServerpodOracle } from "./serverpodOracle.js";
 import type { AssessmentReport, DimensionResult } from "./types.js";
+import { pluralize } from "./text.js";
 
 interface CliArgs {
   config?: string;
@@ -98,7 +99,7 @@ async function main(): Promise<void> {
 
   try {
     const project = await collectProject(client, config.projectId);
-    console.error(`Assessing project: ${project.displayName ?? project.projectId} (${project.apps.length} app(s))`);
+    console.error(`Assessing project: ${project.displayName ?? project.projectId} (${pluralize(project.apps.length, "app")})`);
 
     const rulesResult = await collectRules(client, config.multiTenant, config.tenantIsolationNote);
     const seedCollections = [...new Set([...config.firestoreCollections, ...rulesResult.discoveredFirestoreCollections])];

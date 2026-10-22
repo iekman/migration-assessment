@@ -1,5 +1,6 @@
 import type { DimensionResult, Finding } from "../types.js";
 import type { AssessorConfig } from "../config.js";
+import { pluralize } from "../text.js";
 
 /**
  * Firebase Extensions have no MCP listing tool at all, but several of the
@@ -45,7 +46,7 @@ export function collectUserContext(config: AssessorConfig, sampledCollectionName
       dimension: "operational-context",
       severity: "medium",
       weight: config.installedExtensions.length,
-      summary: `${config.installedExtensions.length} Firebase Extension(s) installed (user-confirmed): ${config.installedExtensions.join(", ")}`,
+      summary: `${pluralize(config.installedExtensions.length, "Firebase Extension")} installed (user-confirmed): ${config.installedExtensions.join(", ")}`,
       detail:
         "Each one is its own migration item (e.g. a Stripe billing extension becomes direct Stripe " +
         "API calls from a Serverpod endpoint; an Algolia-sync extension becomes a manual sync call on write).",

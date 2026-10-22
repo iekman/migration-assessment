@@ -1,6 +1,7 @@
 import type { AssessmentReport, Severity } from "./types.js";
 import { deriveServerpodStrengths } from "./strengths.js";
 import { deriveOpenQuestions } from "./unknowns.js";
+import { pluralize } from "./text.js";
 
 const SEVERITY_ORDER: Record<Severity, number> = { blocker: 0, high: 1, medium: 2, low: 3 };
 const SEVERITY_ICON: Record<Severity, string> = { blocker: "⛔", high: "🔴", medium: "🟠", low: "⚪️" };
@@ -58,7 +59,7 @@ export function renderMarkdown(report: AssessmentReport): string {
   if (failedFindings.length > 0) {
     const failedDimensions = [...new Set(failedFindings.map((f) => f.dimension))];
     lines.push(
-      `**⛔ Before anything else: ${failedFindings.length} check(s) could not be completed this run ` +
+      `**⛔ Before anything else: ${pluralize(failedFindings.length, "check")} could not be completed this run ` +
         `(${failedDimensions.join(", ")}).** The score above reflects only what this run could actually ` +
         `read — it's a lower bound, not a verdict. Fix the access issue named in each "Failed to..." ` +
         `item further down and re-run before sharing this number any further.`,
@@ -101,7 +102,10 @@ export function renderMarkdown(report: AssessmentReport): string {
   // specific instances this run found. ---
   lines.push(`## What needs confirming before this estimate is final`);
   lines.push("");
-  const openQuestions = deriveOpenQuestions(report);
+  const byWeight = (g: { instances: { severity: Severity }[] }) =>
+    g.instances.reduce((sum, f) => sum + SEVERITY_WEIGHT[f.severity], 0);
+  const openQuestions = [...deriveOpenQuestions(report)].sort((a, b) => byWeight(b) - byWeight(a));
+  const totalInstances = openQuestions.reduce((sum, g) => sum + g.instances.length, 0);
   if (openQuestions.length === 0) {
     lines.push(
       "Nothing. Every check this run attempted completed, and no pattern-based suspicion was left " +
@@ -110,37 +114,33 @@ export function renderMarkdown(report: AssessmentReport): string {
     lines.push("");
   } else {
     lines.push(
-      `${openQuestions.length} distinct kind(s) of open question remain, detailed below. Each names ` +
-        `what's actually unknown, when you'd likely discover the surprise if it's left unresolved, and ` +
-        `the quickest way to close it — most take minutes, not days.`,
+      `${pluralize(totalInstances, "specific item needs", "specific items need")} confirming before ` +
+        `this estimate is final, grouped below into ${pluralize(openQuestions.length, "kind")} of open ` +
+        `question. Each numbered item is self-contained enough to copy straight into a ticket — what's ` +
+        `unknown, and the fastest way to close it is in the group heading above it. Most take minutes, not days.`,
     );
     lines.push("");
-    for (const group of [...openQuestions].sort(
-      (a, b) =>
-        b.instances.reduce((sum, f) => sum + SEVERITY_WEIGHT[f.severity], 0) -
-        a.instances.reduce((sum, f) => sum + SEVERITY_WEIGHT[f.severity], 0),
-    )) {
+    let itemNumber = 0;
+    for (const group of openQuestions) {
       lines.push(`### ${group.title}`);
       lines.push("");
       lines.push(`**When you'd likely hit this:** ${group.whenYoudHitIt}`);
       lines.push("");
       lines.push(`**How to resolve it:** ${group.howToResolve}`);
       lines.push("");
-      lines.push(`**Specific to this project:**`);
-      for (const f of group.instances) lines.push(`- ${f.summary}`);
+      for (const f of group.instances) {
+        itemNumber += 1;
+        lines.push(`- [ ] **${itemNumber}.** ${f.summary}`);
+      }
       lines.push("");
     }
 
-    const biggest = [...openQuestions].sort(
-      (a, b) =>
-        b.instances.reduce((sum, f) => sum + SEVERITY_WEIGHT[f.severity], 0) -
-        a.instances.reduce((sum, f) => sum + SEVERITY_WEIGHT[f.severity], 0),
-    )[0];
+    const biggest = openQuestions[0];
     lines.push(
       `**Bottom line:** the single biggest source of remaining uncertainty is "${biggest.title.toLowerCase()}" ` +
-        `(${biggest.instances.length} instance(s) this run). Everything else above is smaller or ` +
-        `faster to close. Resolving all of it before kicking off implementation is cheap insurance — ` +
-        `most items take minutes — against discovering it mid-project instead.`,
+        `(${pluralize(biggest.instances.length, "item")} of the ${totalInstances} above). Everything ` +
+        `else is smaller or faster to close. Resolving all of it before kicking off implementation is ` +
+        `cheap insurance — most items take minutes — against discovering it mid-project instead.`,
     );
     lines.push("");
   }

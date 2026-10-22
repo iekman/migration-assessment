@@ -1,6 +1,7 @@
 import { extractResultData, type IMcpClient } from "../firebaseMcpClient.js";
 import { parseCollectionTree } from "../rulesParser.js";
 import type { DimensionResult, Finding } from "../types.js";
+import { pluralize } from "../text.js";
 
 export interface RulesCollectorResult {
   dimension: DimensionResult;
@@ -80,7 +81,7 @@ export async function collectRules(
           dimension: "security-rules",
           severity: "high",
           weight: 2,
-          summary: `${type}.rules makes ${getExistsCalls} cross-document get()/exists() call(s)`,
+          summary: `${type}.rules makes ${pluralize(getExistsCalls, "cross-document get()/exists() call")}`,
           detail:
             "Rules that read other documents to authorize a request encode relational business " +
             "logic in the rules layer. Serverpod has no declarative rules engine — this becomes " +
@@ -96,7 +97,7 @@ export async function collectRules(
           dimension: "security-rules",
           severity: "medium",
           weight: 1,
-          summary: `${type}.rules defines ${customFunctions} custom helper function(s)`,
+          summary: `${type}.rules defines ${pluralize(customFunctions, "custom helper function")}`,
           detail: "Each helper encodes a reusable authorization predicate to reimplement in Dart.",
         });
       }

@@ -4,12 +4,14 @@
 // firebase/functions-samples) instead of only our own hand-written
 // fixtures. See fixtures/real-world-rules/ and fixtures/real-world-functions.json
 // for provenance notes on each case.
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, unlinkSync } from "node:fs";
 import { strict as assert } from "node:assert";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { parseCollectionTree } from "../dist/rulesParser.js";
 import { classify } from "../dist/collectors/functions.js";
+import { deriveServerpodStrengths } from "../dist/strengths.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(__dirname, "..", "fixtures");
@@ -107,6 +109,84 @@ for (const f of functions) {
 console.log(
   `\nName-only classification: ${nameOnlyCorrect}/${functions.length} correct on real-world function names.`,
 );
+
+// --- Suite 3: deriveServerpodStrengths, run through the REAL pipeline ------
+// strengths.ts detects conditions by pattern-matching finding.summary text
+// produced by the collectors - a purely presentational change to a
+// collector's summary wording can silently break that matching with no
+// type error, since both sides are just strings (this exact thing happened
+// once already: a pluralization pass removed every literal "(s)" from
+// summaries, and strengths.ts's regexes - written against the old format -
+// stopped matching anything, silently dropping two conditional bullets).
+// Running the actual CLI against real fixtures and deriving strengths from
+// its real JSON output, rather than hand-building a fake report here, is
+// what makes this test actually catch that: it exercises the real string
+// contract between collectors and strengths.ts, not a reimplementation of it.
+console.log("\n=== deriveServerpodStrengths: against the real pipeline's own output ===\n");
+const rootDir = path.join(__dirname, "..");
+
+function strengthsFor(fixtureBase) {
+  const outBase = path.join(fixturesDir, `.tmp-${fixtureBase}`);
+  execFileSync(
+    "node",
+    [
+      "dist/cli.js",
+      "--mock",
+      "--fixture-data",
+      `fixtures/${fixtureBase}.json`,
+      "--config",
+      `fixtures/${fixtureBase}.config.json`,
+      "--out",
+      outBase,
+      "--format",
+      "json",
+    ],
+    { cwd: rootDir, stdio: "pipe" },
+  );
+  const report = JSON.parse(readFileSync(`${outBase}.json`, "utf-8"));
+  return deriveServerpodStrengths(report).join("\n---\n");
+}
+
+const STRENGTHS_EXPECTATIONS = [
+  {
+    fixture: "example-messy",
+    mustContain: ["5 background-triggered functions", "request/response-style functions port close to one-to-one"],
+    mustNotContain: ["Firebase bills per read, write, and function invocation"], // the untriggered baseline should not also appear
+  },
+  {
+    fixture: "example-simple",
+    mustContain: ["Firebase bills per read, write, and function invocation"], // no background triggers -> baseline cost bullet
+    mustNotContain: ["background-triggered functions", "request/response-style functions port close to one-to-one"],
+  },
+];
+
+for (const { fixture, mustContain, mustNotContain } of STRENGTHS_EXPECTATIONS) {
+  const text = strengthsFor(fixture);
+  let ok = true;
+  for (const phrase of mustContain) {
+    if (!text.includes(phrase)) {
+      ok = false;
+      failures++;
+      console.log(`FAIL ${fixture}: expected a strength containing "${phrase}", found none`);
+    }
+  }
+  for (const phrase of mustNotContain) {
+    if (text.includes(phrase)) {
+      ok = false;
+      failures++;
+      console.log(`FAIL ${fixture}: did not expect any strength to contain "${phrase}", but one did`);
+    }
+  }
+  if (ok) console.log(`OK ${fixture}`);
+}
+
+for (const { fixture } of STRENGTHS_EXPECTATIONS) {
+  try {
+    unlinkSync(path.join(fixturesDir, `.tmp-${fixture}.json`));
+  } catch {
+    // best-effort cleanup only
+  }
+}
 
 console.log(failures > 0 ? `\n${failures} failure(s).` : "\nAll strict assertions passed.");
 process.exit(failures > 0 ? 1 : 0);
