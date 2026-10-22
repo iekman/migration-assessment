@@ -59,6 +59,7 @@ export function collectUserContext(config: AssessorConfig, sampledCollectionName
       dimension: "operational-context",
       severity: "low",
       weight: 0.5,
+      uncertaintyCategory: "extension-suspected",
       summary: `Suspected Firebase Extension: ${s.extension} (collection name match, unconfirmed)`,
       detail:
         `Found ${s.matched.length === 1 ? "a collection" : "collections"} named ${s.matched.map((c) => `"${c}"`).join(", ")}, ` +

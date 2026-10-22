@@ -168,6 +168,7 @@ export async function collectFunctions(
           dimension: "functions",
           severity: "high",
           weight: count * 3,
+          uncertaintyCategory: "function-behavior-unknown",
           summary: `${count} ${trigger.replace("-trigger", "")} background-trigger function(s): ${names.join(", ")}`,
           detail:
             "Firestore/RTDB/Auth/Storage triggers auto-fire on writes, and Pub/Sub triggers auto-fire " +
@@ -188,6 +189,7 @@ export async function collectFunctions(
           dimension: "functions",
           severity: "medium",
           weight: count * 1,
+          uncertaintyCategory: "function-behavior-unknown",
           summary: `${count} function(s) with undetermined trigger type`,
           detail: `Names: ${classified.filter((f) => f.triggerType === trigger && !functionSideEffects[f.name]).map((f) => f.name).join(", ")}. list_functions didn't expose structured trigger metadata in this server version — verify manually, or fill in functionSideEffects in config.`,
         });
@@ -211,6 +213,7 @@ export async function collectFunctions(
       severity: "medium",
       weight: 1,
       outcome: "failed",
+      uncertaintyCategory: "call-failed",
       summary: "Failed to list functions",
       detail: String(err instanceof Error ? err.message : err),
     });

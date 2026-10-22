@@ -151,6 +151,7 @@ async function main(): Promise<void> {
         ...(config.denormalizedFields.length > 0 ? ["denormalizedFields"] : []),
         ...(Object.keys(config.functionSideEffects).length > 0 ? ["functionSideEffects"] : []),
       ],
+      appPlatforms: [...new Set(project.apps.map((a) => a.platform))],
     };
 
     await enrichWithServerpodOracle(report, config);

@@ -47,6 +47,7 @@ export async function collectAuth(client: IMcpClient, sampleUids: string[]): Pro
         dimension: "auth",
         severity: "medium",
         weight: 1,
+        uncertaintyCategory: "empty-sample",
         summary: `Requested ${sampleUids.length} user(s), got 0 back`,
         detail:
           "Either the UIDs in authSampleUids are wrong/stale (e.g. users since deleted), or this " +
@@ -116,6 +117,7 @@ export async function collectAuth(client: IMcpClient, sampleUids: string[]): Pro
       severity: "medium",
       weight: 1,
       outcome: "failed",
+      uncertaintyCategory: "call-failed",
       summary: "Failed to sample users",
       detail: String(err instanceof Error ? err.message : err),
     });

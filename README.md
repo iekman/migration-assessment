@@ -293,7 +293,40 @@ npm run mock
    node dist/cli.js --config my-project.config.json --format both
    ```
 
-## Known blind spots (also printed at the end of every report)
+## Report structure and audience
+
+The report isn't a single-audience technical dump. It's built in layers,
+each for a different reader:
+
+1. **Executive summary** — plain-language verdict, framed constructively
+   (a `major-rewrite` band gets "this is real cost, and here's what it
+   buys you" rather than only "this is bad") plus a handful of genuinely
+   Serverpod-relevant wins derived from this specific project's own data
+   (`src/strengths.ts`) — not generic marketing copy pasted in regardless
+   of project shape. Written to be shared with a non-technical stakeholder
+   for a go/no-go call.
+2. **Where the effort concentrates** — the dimension score table, for
+   anyone who wants the numeric breakdown.
+3. **What needs confirming before this estimate is final** — replaces a
+   static "known blind spots" list with this project's actual open
+   questions (`src/unknowns.ts`), grouped by kind. Each group states what's
+   unknown, *when* you'd likely discover the surprise if it's left
+   unresolved, and the fastest way to close it — populated only with
+   categories that actually have instances this run, never the full
+   taxonomy regardless of relevance. Ends with a one-line "biggest
+   remaining uncertainty" call-out, by total severity-weighted instance
+   count. Written for whoever is deciding what to do before kickoff, not
+   necessarily an engineer.
+4. **Detailed findings** — the full per-dimension technical record
+   everything above is derived from, for whoever actually scopes or
+   implements the migration.
+5. **Methodology notes** — the remaining structural, always-true caveats
+   (no Firestore listing tool, sampling is capped, etc.) that apply to
+   every run regardless of project and aren't specific enough to belong
+   in section 3.
+
+This section of the README is the dev-facing version of the same
+information — more detail, no audience-shaping:
 
 - No Firestore/Storage listing tool — anything not named in your config
   or discoverable in the rules text is invisible to this report.
@@ -331,7 +364,9 @@ src/
   config.ts                AssessorConfig loading
   schemaInference.ts       Firestore document shape inference
   scoring.ts                dimension weighting -> overall score/band
-  report.ts                  Markdown/JSON rendering
+  report.ts                  Markdown/JSON rendering, layered by audience (see above)
+  strengths.ts                data-driven "why Serverpod fits" bullets for the executive summary
+  unknowns.ts                  per-project "what needs confirming" groups, replacing static boilerplate
   serverpodOracle.ts         optional serverpod_mcp Q&A enrichment
   collectors/                one file per Firebase surface, plus userContext.ts
                               for config-only signals (extensions, multi-tenancy,

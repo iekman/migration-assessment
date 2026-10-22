@@ -1,5 +1,25 @@
 export type Severity = "low" | "medium" | "high" | "blocker";
 
+/**
+ * Names a specific, recurring *kind* of open question this tool can leave
+ * behind - tagged explicitly at the point each finding is created, not
+ * inferred later from its text. Each category has a fixed, general
+ * "when would this surprise you, and how do you resolve it" description
+ * (see unknowns.ts) that applies regardless of which project triggered it;
+ * the per-run instances (which function, which collection, which path)
+ * are what make the report's "what needs confirming" section specific to
+ * this project instead of generic boilerplate.
+ */
+export type UncertaintyCategory =
+  | "function-behavior-unknown"
+  | "denormalization-suspected"
+  | "multitenancy-suspected"
+  | "extension-suspected"
+  | "subcollection-unconfirmed"
+  | "deep-sampling-limit"
+  | "empty-sample"
+  | "call-failed";
+
 export interface Finding {
   dimension: string;
   severity: Severity;
@@ -18,6 +38,8 @@ export interface Finding {
    * in prose a reader might skim past.
    */
   outcome?: "failed";
+  /** See UncertaintyCategory. Only set on findings that represent a real open question, not on routine results. */
+  uncertaintyCategory?: UncertaintyCategory;
 }
 
 export interface DimensionResult {
@@ -34,6 +56,7 @@ export interface AssessmentReport {
   band: "trivial" | "moderate" | "substantial" | "major-rewrite";
   dimensions: DimensionResult[];
   userProvidedContext: string[]; // human-supplied notes folded into the report, see config.ts
+  appPlatforms: string[]; // client platforms this project ships to, for the executive summary
 }
 
 export interface FirestoreFieldShape {

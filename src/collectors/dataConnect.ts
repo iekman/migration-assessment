@@ -58,6 +58,7 @@ export async function collectDataConnect(client: IMcpClient): Promise<DimensionR
         severity: "medium",
         weight: 1,
         outcome: "failed",
+        uncertaintyCategory: "call-failed",
         summary: "Could not determine Data Connect usage - call failed",
         detail: `${String(err instanceof Error ? err.message : err)} This is unknown, not confirmed absent - if this project does use Data Connect, this run missed the complexity discount that would otherwise apply. Check manually (firebase dataconnect:services:list) or fix the permission and re-run.`,
       }],

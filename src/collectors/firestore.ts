@@ -95,11 +95,11 @@ export async function collectFirestore(
   // whether discovered straight out of the rules text (ground truth,
   // already merged into knownSubcollections by the caller) or hand-supplied
   // in config for ones with no explicit rule to parse.
-  const plan: Array<{ path: string; label: string; parent?: string }> = [];
+  const plan: Array<{ path: string; label: string; bareName: string; parent?: string }> = [];
   for (const name of collections) {
-    plan.push({ path: name, label: name });
+    plan.push({ path: name, label: name, bareName: name });
     for (const sub of knownSubcollections[name] ?? []) {
-      plan.push({ path: `${name}/*/${sub}`, label: `${name}/{id}/${sub}`, parent: name });
+      plan.push({ path: `${name}/*/${sub}`, label: `${name}/{id}/${sub}`, bareName: sub, parent: name });
     }
   }
 
@@ -112,6 +112,7 @@ export async function collectFirestore(
           dimension: "firestore-schema",
           severity: "low",
           weight: 0.5,
+          uncertaintyCategory: "empty-sample",
           summary: `Collection "${item.label}" sampled 0 documents`,
           detail: "Either empty, or the query returned no results — verify the collection path.",
         });
@@ -168,6 +169,7 @@ export async function collectFirestore(
           dimension: "firestore-schema",
           severity: "low",
           weight: 0.5,
+          uncertaintyCategory: "denormalization-suspected",
           summary: `Suspected denormalized field: "${item.label}.${s.field}" (user-confirmed subcollections and denormalizedFields entries always suppress this)`,
           detail:
             `Sits alongside "${s.likelyIdField}" in the same document — a common Firestore pattern ` +
@@ -179,11 +181,12 @@ export async function collectFirestore(
         });
       }
 
-      if (!item.parent && !knownSubcollections[item.label]) {
+      if (!item.parent && !knownSubcollections[item.bareName]) {
         findings.push({
           dimension: "firestore-schema",
           severity: "low",
           weight: 0.5,
+          uncertaintyCategory: "subcollection-unconfirmed",
           summary: `Collection "${item.label}": no subcollections found in rules text`,
           detail:
             "The rules-text parser found none nested under this collection, and none were named in " +
@@ -192,12 +195,34 @@ export async function collectFirestore(
             "add them to knownSubcollections in config if you know of any.",
         });
       }
+
+      // The parser can see nesting arbitrarily deep (a.b.c.d), but the
+      // sampling plan above only ever walks one level down from each
+      // top-level seed collection - a subcollection nested two or more
+      // levels deep gets discovered but never sampled, and previously
+      // produced no signal at all that it was even there. If this item
+      // IS a subcollection and it itself has further children, say so.
+      const deeperChildren = knownSubcollections[item.bareName] ?? [];
+      if (item.parent && deeperChildren.length > 0) {
+        findings.push({
+          dimension: "firestore-schema",
+          severity: "medium",
+          weight: 1,
+          uncertaintyCategory: "deep-sampling-limit",
+          summary: `Collection "${item.label}" has its own subcollection(s) (${deeperChildren.join(", ")}) that this run did not sample`,
+          detail:
+            "Discovered from the rules text, two levels deep - sampling only walks one level down " +
+            "from each top-level seed collection, so this data's shape is genuinely unknown, not " +
+            "assumed simple. If it matters, sample it directly with its full path.",
+        });
+      }
     } catch (err) {
       findings.push({
         dimension: "firestore-schema",
         severity: "medium",
         weight: 1,
         outcome: "failed",
+        uncertaintyCategory: "call-failed",
         summary: `Failed to sample collection "${item.label}"`,
         detail: String(err instanceof Error ? err.message : err),
       });

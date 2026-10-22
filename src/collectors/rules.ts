@@ -132,6 +132,7 @@ export async function collectRules(
         severity: "medium",
         weight: 1,
         outcome: "failed",
+        uncertaintyCategory: "call-failed",
         summary: `Could not read ${type} rules`,
         detail: `${String(err instanceof Error ? err.message : err)} This dimension's score does not reflect this surface's actual rule complexity - it's unknown, not confirmed simple. Check manually.`,
       });
@@ -160,6 +161,7 @@ export async function collectRules(
       dimension: "security-rules",
       severity: "medium",
       weight: 1,
+      uncertaintyCategory: "multitenancy-suspected",
       summary: `Suspected multi-tenancy: rules reference ${[...allTenantHints].join(", ")}`,
       detail:
         "Not confirmed — this is a pattern match on field/claim names in the rules text, not a " +

@@ -53,6 +53,7 @@ export async function collectRemoteConfig(client: IMcpClient): Promise<Dimension
           severity: "medium",
           weight: 1,
           outcome: "failed",
+          uncertaintyCategory: "call-failed",
           summary: "Failed to fetch Remote Config template",
           detail: `${String(err instanceof Error ? err.message : err)} Unknown, not confirmed simple - this dimension's score is a placeholder, not a real read.`,
         },
