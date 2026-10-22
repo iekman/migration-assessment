@@ -48,7 +48,14 @@ export async function collectRemoteConfig(client: IMcpClient): Promise<Dimension
       dimension: "Remote Config -> Feature Flags",
       score: 3,
       findings: [
-        { dimension: "remote-config", severity: "low", weight: 1, summary: "Failed to fetch Remote Config template", detail: String(err instanceof Error ? err.message : err) },
+        {
+          dimension: "remote-config",
+          severity: "medium",
+          weight: 1,
+          outcome: "failed",
+          summary: "Failed to fetch Remote Config template",
+          detail: `${String(err instanceof Error ? err.message : err)} Unknown, not confirmed simple - this dimension's score is a placeholder, not a real read.`,
+        },
       ],
     };
   }

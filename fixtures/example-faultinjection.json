@@ -1,0 +1,34 @@
+{
+  "responses": {
+    "get_project": { "displayName": "AccessDenied Co" },
+    "list_apps": [{ "platform": "WEB", "appId": "1:555:web:a" }],
+    "get_security_rules": {
+      "__byArg__": "type",
+      "values": {
+        "firestore": {
+          "source": "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{db}/documents {\n    match /notes/{noteId} {\n      allow read, write: if request.auth.uid == resource.data.ownerId;\n    }\n  }\n}\n"
+        },
+        "storage": { "__throw__": "PERMISSION_DENIED: caller lacks firebasestorage.rules.get on this project" },
+        "database": { "source": "{\n  \"rules\": {\n    \".read\": false,\n    \".write\": false\n  }\n}\n" }
+      }
+    },
+    "query_collection": {
+      "__byArg__": "collection_path",
+      "values": {
+        "notes": { "documents": [{ "data": { "title": "Reminder", "ownerId": "u1" } }, { "data": { "title": "Idea", "ownerId": "u1" } }] },
+        "archived_legacy": { "__throw__": "PERMISSION_DENIED: caller does not have datastore.entities.get on collection archived_legacy" }
+      }
+    },
+    "list_functions": { "__throw__": "PERMISSION_DENIED: caller lacks cloudfunctions.functions.list" },
+    "get_users": { "__throw__": "PERMISSION_DENIED: caller lacks firebaseauth.users.get" },
+    "get_data": {
+      "__byArg__": "path",
+      "values": {
+        "/status": { "online": true },
+        "/archive": { "__throw__": "PERMISSION_DENIED: caller lacks firebasedatabase.instances.get on path /archive" }
+      }
+    },
+    "get_template": { "__throw__": "PERMISSION_DENIED: caller lacks remoteconfig.remoteConfigs.get" },
+    "list_services": { "__throw__": "PERMISSION_DENIED: caller lacks firebasedataconnect.services.list" }
+  }
+}

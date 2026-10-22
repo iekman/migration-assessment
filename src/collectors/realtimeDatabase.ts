@@ -83,6 +83,7 @@ export async function collectRealtimeDatabase(client: IMcpClient, paths: string[
         dimension: "rtdb",
         severity: "medium",
         weight: 1,
+        outcome: "failed",
         summary: `Failed to read path "${path}"`,
         detail: String(err instanceof Error ? err.message : err),
       });

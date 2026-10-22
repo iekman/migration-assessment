@@ -197,6 +197,7 @@ export async function collectFirestore(
         dimension: "firestore-schema",
         severity: "medium",
         weight: 1,
+        outcome: "failed",
         summary: `Failed to sample collection "${item.label}"`,
         detail: String(err instanceof Error ? err.message : err),
       });

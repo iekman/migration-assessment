@@ -37,12 +37,30 @@ export async function collectDataConnect(client: IMcpClient): Promise<DimensionR
       // only; nothing reads it back for scoring.
       return { dimension: "Data Connect -> Already Postgres", score: -1.5, findings };
     }
-    return { dimension: "Data Connect -> Already Postgres", score: 0, findings };
-  } catch {
     return {
       dimension: "Data Connect -> Already Postgres",
       score: 0,
-      findings: [{ dimension: "dataconnect", severity: "low", weight: 0, summary: "No Data Connect services (or not enabled on this project)", detail: "No effect on the assessment." }],
+      findings: [{ dimension: "dataconnect", severity: "low", weight: 0, summary: "No Data Connect services found", detail: "The tool call succeeded and returned zero services - genuinely not in use." }],
+    };
+  } catch (err) {
+    // Deliberately distinct from the "called successfully, zero services"
+    // case above: a thrown error (e.g. a permission error on this specific
+    // API) means usage is actually UNKNOWN, not confirmed absent - and since
+    // Data Connect is the one dimension that gives a discount when present,
+    // silently treating "the call failed" the same as "confirmed not in
+    // use" risks a real project losing that discount to nothing more than
+    // a missing IAM role.
+    return {
+      dimension: "Data Connect -> Already Postgres",
+      score: 0,
+      findings: [{
+        dimension: "dataconnect",
+        severity: "medium",
+        weight: 1,
+        outcome: "failed",
+        summary: "Could not determine Data Connect usage - call failed",
+        detail: `${String(err instanceof Error ? err.message : err)} This is unknown, not confirmed absent - if this project does use Data Connect, this run missed the complexity discount that would otherwise apply. Check manually (firebase dataconnect:services:list) or fix the permission and re-run.`,
+      }],
     };
   }
 }

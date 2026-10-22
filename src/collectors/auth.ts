@@ -115,6 +115,7 @@ export async function collectAuth(client: IMcpClient, sampleUids: string[]): Pro
       dimension: "auth",
       severity: "medium",
       weight: 1,
+      outcome: "failed",
       summary: "Failed to sample users",
       detail: String(err instanceof Error ? err.message : err),
     });

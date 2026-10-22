@@ -210,6 +210,7 @@ export async function collectFunctions(
       dimension: "functions",
       severity: "medium",
       weight: 1,
+      outcome: "failed",
       summary: "Failed to list functions",
       detail: String(err instanceof Error ? err.message : err),
     });

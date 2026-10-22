@@ -122,12 +122,18 @@ export async function collectRules(
         });
       }
     } catch (err) {
+      // medium, not low: a blocked rules read is a total blind spot on
+      // authorization logic for this surface, not a minor note - and a
+      // "0.0" dimension score next to it reads exactly like "confirmed
+      // simple," which it very much is not. Consistent with how every
+      // other collector's "I got nothing back" case is already severed.
       findings.push({
         dimension: "security-rules",
-        severity: "low",
-        weight: 0.5,
+        severity: "medium",
+        weight: 1,
+        outcome: "failed",
         summary: `Could not read ${type} rules`,
-        detail: String(err instanceof Error ? err.message : err),
+        detail: `${String(err instanceof Error ? err.message : err)} This dimension's score does not reflect this surface's actual rule complexity - it's unknown, not confirmed simple. Check manually.`,
       });
     }
   }

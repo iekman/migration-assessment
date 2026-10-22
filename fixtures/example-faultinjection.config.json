@@ -1,0 +1,14 @@
+{
+  "projectId": "access-denied-co-example",
+  "firestoreCollections": ["notes", "archived_legacy"],
+  "knownSubcollections": {},
+  "denormalizedFields": [],
+  "sampleSize": 25,
+  "realtimeDatabasePaths": ["/status", "/archive"],
+  "authSampleUids": ["u1"],
+  "multiTenant": false,
+  "installedExtensions": [],
+  "deploymentModel": "persistent",
+  "functionSideEffects": {},
+  "useServerpodOracle": false
+}

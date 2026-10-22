@@ -17,6 +17,22 @@ export function renderMarkdown(report: AssessmentReport): string {
   lines.push(`**Project:** \`${report.projectId}\`${report.mock ? " _(mock data)_" : ""}`);
   lines.push(`**Generated:** ${report.generatedAt}`);
   lines.push(`**Overall complexity:** ${report.overallScore.toFixed(1)} / 10 — ${BAND_LABEL[report.band]}`);
+  const failedFindings = report.dimensions.flatMap((d) => d.findings).filter((f) => f.outcome === "failed");
+  if (failedFindings.length > 0) {
+    const failedDimensions = [...new Set(failedFindings.map((f) => f.dimension))];
+    lines.push(
+      `**⛔ ${failedFindings.length} check(s) failed outright (${failedDimensions.join(", ")}) — the ` +
+        `score above is a lower bound, not a verdict.** A dimension whose read failed contributes a ` +
+        `low/zero score exactly as if it had been confirmed simple - it was not confirmed anything. ` +
+        `See each "Failed to..."/"Could not..." finding below for why, and re-run after fixing it ` +
+        `before trusting this number.`,
+    );
+  }
+  lines.push(
+    report.userProvidedContext.length > 0
+      ? `**Manually confirmed input used:** ${report.userProvidedContext.join(", ")}`
+      : `**Manually confirmed input used:** none — this run relied entirely on auto-discovery and heuristics; treat "Suspected ..." findings below with extra caution`,
+  );
   lines.push("");
 
   lines.push(`## Dimension scores`);
@@ -38,13 +54,6 @@ export function renderMarkdown(report: AssessmentReport): string {
       lines.push(`  ${f.detail}`);
       if (f.serverpodNote) lines.push(`  > Serverpod: ${f.serverpodNote}`);
     }
-    lines.push("");
-  }
-
-  if (report.skipped.length > 0) {
-    lines.push(`## Not assessed`);
-    lines.push("");
-    for (const s of report.skipped) lines.push(`- ${s}`);
     lines.push("");
   }
 

@@ -146,6 +146,87 @@ rules, and nothing for functions or auth — a disposable real Firebase
 project remains the only way to exercise those end to end, which is real
 setup cost, not something to take on without deciding it's worth it first.
 
+### Hand-built example scenarios, and what they caught
+
+Beyond harvested real-world text, `fixtures/example-*.json` + `.config.json`
+pairs are purpose-built scenarios — pick one with `--fixture-data`:
+
+- `example-simple`: a flat one-collection app. Scores near 0 - mostly
+  mechanical porting.
+- `example-messy`: deliberately maximal across every dimension (schema
+  drift, confirmed + suspected denormalization, multi-tenancy, six
+  background-trigger functions across every trigger family, deep RTDB
+  nesting, a confirmed extension alongside a suspected one, serverless
+  clashing with a scheduled function). Scores "substantial."
+- `example-fittrack`, `example-bloghub`: mid-complexity scenarios built to
+  specifically exercise paths the two above hadn't - an empty `get_users`
+  result, a shallow (not deep) RTDB path, a `functionSideEffects` override
+  on a non-background-trigger function, a subcollection declared both via
+  config and discoverable from rules (checks for a duplicate-sampling bug;
+  there wasn't one), and a 3-level-deep rules chain in the *flat*
+  multi-segment form specifically, as a second, independent check on a fix
+  described below.
+- `example-faultinjection`: every live-sampling call fails (simulating a
+  service account missing specific IAM roles, which the setup instructions
+  above can easily lead to in practice) via `mockClient.ts`'s `__throw__`
+  fixture sentinel, added specifically to make this scenario possible -
+  before it existed, every `catch` block in every collector was provably
+  unreachable in `--mock` mode, since a tool name either had a fixture
+  entry (so every call to it always succeeded) or didn't (so the collector
+  never called it at all). There was no way to express "this tool exists
+  and usually works, but this specific call fails."
+
+Building these four caught real bugs, each the same shape: a value gets
+computed and attached to a finding or the report, and nothing downstream
+ever reads it back.
+
+- The Data Connect "discount" described earlier in this README never
+  actually did anything: `Finding.weight` is set throughout the codebase
+  but read nowhere, and `collectDataConnect` hardcoded its dimension score
+  to `0` regardless of whether services were present. Fixed by returning a
+  genuinely negative dimension score when Data Connect is in use, which is
+  what the overall weighted average actually reads.
+- `wildcardDepth`'s own capturing group (`[^\{]+`) structurally excluded
+  the `{` characters the very next line searched for — not "rarely
+  triggers," mathematically guaranteed to always compute `0`, for any
+  rules file, ever. Replaced with `maxNestingDepth`, computed from the
+  already real-world-validated collection tree in `rulesParser.ts`, and
+  confirmed firing via two independent cases (block-nested and flat-form).
+- `FirestoreFieldShape.nullable` was set in `schemaInference.ts` and read
+  nowhere - wired into a real finding (a sometimes-null field needs a
+  nullable Dart type, not a `NOT NULL` column).
+- `AssessmentReport.userProvidedContext` was computed correctly but never
+  rendered in the markdown report (only present in the JSON output) - now
+  a line near the top of every report.
+- `AssessmentReport.skipped` had dedicated rendering logic in `report.ts`
+  but was hardcoded to `[]` in `cli.ts` and populated by nothing - the
+  "Not assessed" section could never appear under any input. Removed
+  rather than wired up, since doing it properly needs each collector to
+  signal "I didn't run at all" through a side channel, which is a bigger
+  change than this pass called for.
+- `collectAuth` produced zero findings when `get_users` returned an empty
+  array despite real UIDs being requested - no way to tell "wrong/stale
+  UIDs" from "genuinely no users" apart. Now says so explicitly.
+- Two inconsistent-severity bugs surfaced by fault injection specifically:
+  a blocked rules read and a failed Remote Config fetch were both marked
+  `low` severity, while every other collector's identical "got nothing
+  back" case was already `medium` - standardized.
+- The sharpest one: `collectDataConnect`'s bare `catch {}` reported a
+  permission error identically to "called successfully, confirmed zero
+  services" - meaning a real project using Data Connect could silently
+  lose its complexity discount to nothing more than a missing IAM role,
+  with the report claiming "No effect on the assessment" with total
+  unearned confidence. Fixed to distinguish the two explicitly.
+- Fault injection also exposed a report-level gap, not a collector bug:
+  when most collectors fail, the headline "X/10, trivial" number reads as
+  "this project is simple" when the truth is "almost nothing could be
+  read." Every catch-block finding now carries `outcome: "failed"`
+  (deliberately distinct from "this MCP server doesn't support that tool,"
+  a separate, already-documented structural gap), and the report leads
+  with an explicit warning whenever any are present, naming which
+  dimensions failed and stating plainly that the score below is a lower
+  bound, not a verdict.
+
 ## Try it without any credentials
 
 ```bash

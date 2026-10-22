@@ -144,7 +144,6 @@ async function main(): Promise<void> {
       overallScore,
       band,
       dimensions,
-      skipped: [],
       userProvidedContext: [
         ...(config.multiTenant ? ["multiTenant"] : []),
         ...(config.installedExtensions.length > 0 ? ["installedExtensions"] : []),
